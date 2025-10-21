@@ -69,7 +69,7 @@ bash <(curl -sL https://gitlab.com/gebu8f/sh/-/raw/main/testing_server/test.sh)
 為了方便使用，你可以執行以下指令，將 `MatrixBench` 安裝為一個全域的 `mb` 指令。這個指令會自動保持最新。
 
 ```bash
-bash <(curl -sL https://gitlab.com/gebu8f/sh/-/raw/main/testing_server/test.sh) --install
+bash <(curl -sL https://gitlab.com/gebu8f/sh/-/raw/main/testing_server/mb.sh) --install
 ```
 ## 🙏 致謝 (Acknowledgements)
 
