@@ -64,6 +64,13 @@ bash <(curl -sL https://gitlab.com/gebu8f/sh/-/raw/main/testing_server/test.sh)
     ├── global_net.txt
     └── report.txt
 ```
+## 🚀 設為系統指令 (推薦)
+
+為了方便使用，你可以執行以下指令，將 `MatrixBench` 安裝為一個全域的 `mb` 指令。這個指令會自動保持最新。
+
+```bash
+bash <(curl -sL https://gitlab.com/gebu8f/sh/-/raw/main/testing_server/test.sh) --install
+```
 ## 🙏 致謝 (Acknowledgements)
 
 本專案的順利開發，離不開以下優秀的開源專案和作者，在此表示誠摯的感謝。`MatrixBench` 是在他們的基礎之上，專注於提供更深層次的診斷分析。
