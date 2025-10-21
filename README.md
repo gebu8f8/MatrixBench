@@ -17,7 +17,7 @@
 執行以下指令即可開始全方位體檢。腳本會自動處理所需的依賴安裝。
 
 ```bash
-bash <(curl -sL https://gitlab.com/gebu8f/sh/-/raw/main/testing_server/test.sh)
+bash <(curl -sL https://gitlab.com/gebu8f/sh/-/raw/main/testing_server/mb.sh)
 ```
 > **注意:** 首次運行或伺服器環境極簡時，腳本會自動安裝必要的工具（如 `curl`, `jq`, `wkhtmltoimage` 等），這可能需要一些時間。
 
