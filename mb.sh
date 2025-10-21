@@ -33,7 +33,7 @@ YELLOW='\033[1;33m'  # ⚠️ 警告用黃色
 CYAN="\033[1;36m"    # ℹ️ 一般提示用青色
 RESET='\033[0m'      # 清除顏色
 
-version="v2025.10.20"
+version="v2025.10.21"
 
 lang(){
   # 語言設定函式 - 目前使用命令行參數控制
@@ -117,89 +117,136 @@ check_system(){
     exit 1
   fi
 }
+install_wkhtmltox_manual() {
+    # C 計劃第一步：手動處理 libssl1.1 這個最關鍵的依賴
+    # 檢查系統是否缺少 libssl1.1
+    if ! dpkg -l | grep -q "libssl1.1"; then
+        echo -e "${YELLOW}System is missing libssl1.1, a dependency for wkhtmltopdf. Attempting to install it manually...${RESET}"
+        
+        local ARCH=$(uname -m)
+        local LIBSSL_URL=""
+        
+        if [ "$ARCH" = "x86_64" ]; then
+            # 從 Debian 11 (Bullseye) 的官方倉庫獲取，這是最穩定的來源
+            LIBSSL_URL="http://ftp.us.debian.org/debian/pool/main/o/openssl/libssl1.1_1.1.1w-0+deb11u1_amd64.deb"
+        elif [ "$ARCH" = "aarch64" ]; then
+            LIBSSL_URL="http://ftp.us.debian.org/debian/pool/main/o/openssl/libssl1.1_1.1.1w-0+deb11u1_arm64.deb"
+        fi
+
+        if [ -n "$LIBSSL_URL" ]; then
+            local LIBSSL_PATH="$TEMP_WORKDIR/libssl1.1.deb"
+            echo -e "${CYAN}Downloading libssl1.1 from $LIBSSL_URL...${RESET}"
+            if curl -sL -o "$LIBSSL_PATH" "$LIBSSL_URL"; then
+                dpkg -i "$LIBSSL_PATH"
+            else
+                echo -e "${RED}Failed to download libssl1.1 package.${RESET}"
+                return 1 # 返回失敗
+            fi
+        else
+            echo -e "${RED}Unsupported architecture for manual libssl1.1 installation: $ARCH${RESET}"
+            return 1 # 返回失敗
+        fi
+    fi
+
+    # C 計劃第二步：現在 libssl1.1 已經就位，可以安全地安裝 wkhtmltox 了
+    echo -e "${CYAN}Proceeding with manual installation of wkhtmltopdf...${RESET}"
+    local WK_VER="0.12.6-1"
+    local ARCH=$(uname -m)
+    local DEB_URL=""
+
+    if [ "$ARCH" = "x86_64" ]; then
+        DEB_URL="https://github.com/wkhtmltopdf/packaging/releases/download/${WK_VER}/wkhtmltox_${WK_VER}.buster_amd64.deb"
+    elif [ "$ARCH" = "aarch64" ]; then
+        DEB_URL="https://github.com/wkhtmltopdf/packaging/releases/download/${WK_VER}/wkhtmltox_${WK_VER}.buster_arm64.deb"
+    else
+        echo -e "${RED}Unsupported architecture for manual wkhtmltopdf installation: $ARCH${RESET}"
+        return 1 # 返回失敗
+    fi
+
+    if [ -n "$DEB_URL" ]; then
+        local DEB_PATH="$TEMP_WORKDIR/wkhtmltox.deb"
+        echo -e "${CYAN}Downloading from $DEB_URL...${RESET}"
+        if curl -sL -o "$DEB_PATH" "$DEB_URL"; then
+            # 使用 dpkg 安裝, 它可能會抱怨其他依賴, 但最關鍵的 libssl1.1 已經解決
+            dpkg -i "$DEB_PATH"
+            # 讓 apt 來解決剩下的所有常規依賴 (如 libxrender1, xfonts 等)
+            echo -e "${CYAN}Fixing remaining dependencies...${RESET}"
+            apt-get -f install -y
+        else
+            echo -e "${RED}Failed to download wkhtmltopdf package.${RESET}"
+            return 1 # 返回失敗
+        fi
+    fi
+    return 0 # 返回成功
+}
+
 check_app(){
-  for cmd in curl jq unzip; do
+  # --- 基礎工具安裝 (優化後) ---
+  local missing_pkgs=()
+  declare -A pkg_map
+  pkg_map=( ["stress-ng"]="stress-ng" ["sar"]="sysstat" ["curl"]="curl" ["jq"]="jq" ["unzip"]="unzip" ["fc-list"]="fontconfig" )
+  pkg_map["script"]=$([[ "$system" -eq 1 ]] && echo "bsdutils" || echo "util-linux")
+  
+  for cmd in "${!pkg_map[@]}"; do
     if ! command -v "$cmd" &> /dev/null; then
-      if command -v apt >/dev/null 2>&1; then
-        apt install "$cmd" -y
-      elif command -v yum >/dev/null 2>&1; then
-        yum install "$cmd" -y
-      elif command -v apk >/dev/null 2>&1; then
-        apk add "$cmd"
+      missing_pkgs+=("${pkg_map[$cmd]}")
+    fi
+  done
+
+  if [ ${#missing_pkgs[@]} -gt 0 ]; then
+    case $system in
+      1) apt-get update -qq && apt-get install -y "${missing_pkgs[@]}" ;;
+      2) yum install -y "${missing_pkgs[@]}" ;;
+      3) apk add --no-cache "${missing_pkgs[@]}" ;;
+    esac
+  fi
+  
+  # --- Emoji 字體安裝 ---
+  if ! fc-list | grep -qi "NotoColorEmoji"; then
+    echo -e "${CYAN}Installing Noto Color Emoji font...${RESET}"
+    case $system in
+      1) apt-get install -y fonts-noto-color-emoji ;;
+      2) [[ ! $(yum repolist enabled | grep "epel") ]] && yum install -y epel-release; yum install -y google-noto-emoji-color-fonts ;;
+      3) apk add --no-cache font-noto-emoji ;;
+    esac
+  fi
+
+  # --- 圖片處理與截圖工具安裝 (終極改造版) ---
+  local install_needed=false
+  for cmd in pngquant wkhtmltoimage aha; do
+    if ! command -v "$cmd" &>/dev/null; then
+      install_needed=true
+      break
+    fi
+  done
+  
+  if $install_needed; then
+    local img_tools=("aha" "pngquant")
+    # 對於 CentOS/RHEL 系統, 確保 EPEL 源已啟用
+    if [[ "$system" -eq 2 ]] && ! yum repolist enabled | grep -q "epel"; then
+      yum install -y epel-release
+    fi
+
+    case $system in
+    1) apt-get install -y "${img_tools[@]}" wkhtmltopdf ;;
+    2) yum install -y "${img_tools[@]}" wkhtmltopdf ;;
+    3) apk add --no-cache "${img_tools[@]}" wkhtmltopdf ;;
+    esac
+
+    if ! command -v "wkhtmltoimage" &> /dev/null; then
+      if [[ "$system" -eq 1 ]]; then
+        install_wkhtmltox_manual
+      else
+        echo -e "${RED}Package manager failed to install wkhtmltopdf on this non-Debian system. Manual installation is not supported.${RESET}"
       fi
     fi
-  done
-  if ! command -v aha >/dev/null 2>&1 && ! command -v wkhtmltopdf >/dev/null 2>&1; then 
-    case $system in
-    1)
-      apt install -y aha wkhtmltopdf
-      ;;
-    2)
-      yum install -y epel-release
-      yum install -y aha wkhtmltopdf
-      ;;
-    3)
-      apk add aha wkhtmltopdf
-      ;;
-    esac
-  fi
-  if ! command -v script >/dev/null 2>&1; then
-    case $system in
-    1)
-      apt install -y bsdutils
-      ;;
-    2)
-      yum install -y util-linux
-      ;;
-    3)
-      apk add util-linux
-      ;;
-    esac
-  fi
-  if ! fc-list | grep -i "NotoColorEmoji" >/dev/null 2>&1; then
-  case $system in
-    1)
-      apt install -y fonts-noto-color-emoji
-      ;;
-    2)
-      yum install -y google-noto-emoji-color-fonts
-      ;;
-    3)
-      apk add --no-cache font-noto-emoji
-      ;;
-    esac
-  fi
-  for cmd in stress-ng sar; do
-    if ! command -v "$cmd" &> /dev/null; then
-      case $system in
-      1)
-        apt install -y stress-ng sysstat
-        ;;
-      2)
-        yum install -y epel-release
-        yum install -y stress-ng sysstat
-        ;;
-      3)
-        apk add stress-ng sysstat
-        ;;
-      esac
-    fi
-  done
-  if ! command -v pngquant >/dev/null 2>&1; then
-    case $system in
-    1)
-      apt install -y pngquant
-      ;;
-    2)
-      yum install -y epel-release
-      yum install -y pngquant
-      ;;
-    3)
-      apk add --no-cache pngquant
-      ;;
-    esac
   fi
     
+  # --- 最終檢查 ---
+  if ! command -v "wkhtmltoimage" &> /dev/null; then
+    echo -e "${RED}FATAL: wkhtmltoimage could not be installed. Image report generation is not possible.${RESET}"
+    exit 1
+  fi
 }
 compress_png() {
   local image_path="$1"
@@ -270,58 +317,72 @@ ecs_download() {
   # 6. 刪除壓縮檔
   rm "$ZIPPED_FILE_PATH"
 }
-ecs_simple_static() (
+ecs_simple_static() {
   local EXECUTABLE_PATH="$TEMP_WORKDIR/goecs"
   local RESULT_DIR="$HOME/result"
   local TEMP_HTML="$TEMP_WORKDIR/temp.html"
   local TEMP_OUTPUT="$TEMP_WORKDIR/temp_output.txt"
   local FINAL_IMAGE_FILE="${RESULT_DIR}/base.png"
 
-  # 根據語言設定文字和匹配模式
+  #--- 語系設定 -------------------------------------------------
   case "$lang" in
     cn)
       local t_reading="读取系统资讯..."
       local t_complete="读取系统资讯完成"
       local t_title="系统资讯"
       local lang_param="zh"
-      local awk_pattern='/^-+系统基础信息/{p=1} p{print} /^-+$/ && p && NR>1{exit}'
+      local title_keyword="系统基础信息"
       ;;
     us)
       local t_reading="Reading system information..."
       local t_complete="System information reading completed"
       local t_title="System Information"
       local lang_param="en"
-      local awk_pattern='/^-+System-Basic-Information/{p=1} p{print} /^-+$/ && p && NR>1{exit}'
+      local title_keyword="System-Basic-Information"
       ;;
     *)
       local t_reading="讀取系統資訊..."
       local t_complete="讀取系統資訊完成"
       local t_title="系統資訊"
       local lang_param="zh"
-      local awk_pattern='/^-+系统基础信息/{p=1} p{print} /^-+$/ && p && NR>1{exit}'
+      local title_keyword="系统基础信息"
       ;;
   esac
 
   echo -e "${CYAN}${t_reading}${RESET}"
-  
   mkdir -p "$RESULT_DIR"
+  cd "$TEMP_WORKDIR" || exit 1
   
-  cd $TEMP_WORKDIR
+  script -qfc "$EXECUTABLE_PATH -l $lang_param -menu=false -log=false \
+    -basic=true -cpu=false -memory=false -disk=false \
+    -comm=false -email=false -nt3=false -security=false \
+    -speed=false -upload=false -ut=false -backtrace=false" \
+    /dev/null 2>/dev/null | tee "$TEMP_OUTPUT"
 
-  # 1. 捕獲終端輸出並過濾只要基礎資訊區塊
-  script -qfc "$EXECUTABLE_PATH -l $lang_param -menu=false -log=false -basic=true -cpu=false -memory=false -disk=false -comm=false -email=false -nt3=false -security=false -speed=false -upload=false -ut=false -backtrace=false" /dev/null 2>/dev/null | tee "$TEMP_OUTPUT" 
   echo -e "${GREEN}${t_complete}${RESET}"
 
-  # 2. 提取基礎資訊區塊（從標題到第一個分隔線）
-  awk "$awk_pattern" "$TEMP_OUTPUT" | \
-    aha --title "$t_title" --stylesheet > "$TEMP_HTML"
-
-  # 3. 添加自定義樣式來顯示顏色
+  #--- 2. 只保留「系統資訊」區塊 ------------------------------------
+  local extracted_block=$(awk -v kw="$title_keyword" '
+    # 規則1: 只要找到包含關鍵字的行，就打開 "found" 開關
+    $0 ~ kw { found=1 }
+    
+    # 規則2: 只要 "found" 開關是打開的，就執行以下操作
+    found {
+        # 動作1: 打印當前行
+        print
+        
+        # 動作2: 檢查是否滿足 "終結條件"
+        # 條件是：以 "---" 開頭，並且不包含我們的關鍵字
+        if ($0 ~ /^---/ && $0 !~ kw) {
+            exit # 滿足條件，打印完後立刻退出
+        }
+    }
+  ' "$TEMP_OUTPUT")
+  
+  aha --title "$t_title" --stylesheet <<< "$extracted_block" > "$TEMP_HTML"
   sed -i '/<\/style>/i \
     body { background-color: #0c0c0c; color: #cccccc; font-family: "Noto Color Emoji", "Segoe UI Emoji", "Apple Color Emoji", "Courier New", monospace; padding: 20px; } \
     pre { white-space: pre-wrap; word-wrap: break-word; }' "$TEMP_HTML"
-
-  # 4. 轉換為 PNG
   wkhtmltoimage \
     --width 800 \
     --height 0 \
@@ -330,8 +391,9 @@ ecs_simple_static() (
     --enable-local-file-access \
     "$TEMP_HTML" \
     "$FINAL_IMAGE_FILE" >/dev/null 2>&1
-  compress_png $FINAL_IMAGE_FILE
-)
+    compress_png "$FINAL_IMAGE_FILE"
+}
+
 hardware_benchmarks() (
   # --- 設定 ---
   local ECS_DIR="$TEMP_WORKDIR"
@@ -412,36 +474,36 @@ hardware_benchmarks() (
   # 根據語言設定文字
   case "$lang" in
     cn)
-      local t_cpu_sys="CPU测试（sysbench）"
+      local t_cpu_sys="## CPU测试（sysbench）"
       local t_single="单核"
       local t_multi="多核"
-      local t_cpu_gb6="CPU测试（GeekBench 6）"
-      local t_memory="内存测试"
+      local t_cpu_gb6="## CPU测试（GeekBench 6）"
+      local t_memory="## 内存测试"
       local t_read="读取"
       local t_write="写入"
-      local t_disk="硬盘（MD档）"
+      local t_disk="## 硬盘"
       local t_combined="总合"
       ;;
     us)
       local t_cpu_sys="CPU Test (sysbench)"
       local t_single="Single Core"
       local t_multi="Multi Core"
-      local t_cpu_gb6="CPU Test (GeekBench 6)"
-      local t_memory="Memory Test"
+      local t_cpu_gb6="## CPU Test (GeekBench 6)"
+      local t_memory="## Memory Test"
       local t_read="Read"
       local t_write="Write"
-      local t_disk="Disk (MD Format)"
+      local t_disk="## Disk"
       local t_combined="Total"
       ;;
     *)
-      local t_cpu_sys="CPU測試（sysbench）"
+      local t_cpu_sys="## CPU測試（sysbench）"
       local t_single="單核"
       local t_multi="多核"
-      local t_cpu_gb6="CPU測試（GeekBench 6）"
-      local t_memory="記憶體測試"
+      local t_cpu_gb6="## CPU測試（GeekBench 6）"
+      local t_memory="## 記憶體測試"
       local t_read="讀取"
       local t_write="寫入"
-      local t_disk="硬碟（MD檔）"
+      local t_disk="## 硬碟"
       local t_combined="總合"
       ;;
   esac
@@ -534,11 +596,8 @@ cpu_test() {
 
   # 2. 進行分析
   local data_lines=$(echo "$lscpu_output" | tail -n +2)
-  
   local logical_cores=$(echo "$data_lines" | grep -c .)
-  
   local sockets=$(echo "$data_lines" | awk '{print $3}' | sort -u | wc -l)
-  
   local physical_cores=$(echo "$data_lines" | awk '{print $3, $4}' | sort -u | wc -l)
 
   local ht_status="$t_disabled"
@@ -548,17 +607,17 @@ cpu_test() {
   
   # 3. 產生帶有智能判斷的分析摘要
   local analysis_summary
-  
-  # 關鍵判斷：如果插槽數大於1，且物理核心數等於插槽數，這就是您指出的低效配置
   if [ "$sockets" -gt 1 ] && [ "$physical_cores" -eq "$sockets" ]; then
-    analysis_summary="${t_result}: ${sockets} ${t_socket}, ${physical_cores} ${t_physical} | ${t_ht}: ${ht_status}\n${t_warning}"
+    # 【關鍵】在這裡，我們使用 printf 的 -v 選項來安全地將多行文本賦值給變數，避免 \n 問題的根源
+    printf -v analysis_summary "%s: %d %s, %d %s | %s: %s\n%s" \
+      "$t_result" "$sockets" "$t_socket" "$physical_cores" "$t_physical" \
+      "$t_ht" "$ht_status" "$t_warning"
   else
-    # 正常情況下的標準輸出
     analysis_summary="${t_result}: ${sockets} ${t_socket}, ${physical_cores} ${t_physical}, ${logical_cores} ${t_thread} | ${t_ht}: ${ht_status}"
   fi
 
-  # 4. 將分析結果顯示在終端 (使用 printf 處理可能的多行輸出)
-  printf "%s\n" "$analysis_summary"
+  # 4. 將分析結果顯示在終端
+  echo -e "$analysis_summary"
 
   # 5. 將所有內容附加到報告文件
   {
@@ -568,81 +627,78 @@ cpu_test() {
     echo "$lscpu_output"
     echo '```'
     echo ""
-    # 寫入報告時也使用 printf 以保持格式一致
-    printf "%s\n" "$analysis_summary"
-
-  } >> "$report"
-
+    echo -e "$analysis_summary"
+  } > "$report"
 }
 cpu_oversell_test() {
-local report="$HOME/result/hardware.txt"
-mkdir -p "$(dirname "$report")"
+  local report="$HOME/result/hardware.txt"
+  mkdir -p "$(dirname "$report")"
 
-# --- 多語言文本定義 (整合版) ---
-case "$lang" in
-cn)
-  local t_title="## CPU 诚信度与压力测试"
-  local t_start="${CYAN}开始执行 CPU 诚信度与压力综合测试...${RESET}"
-  local t_params="[参数: 2轮静态分析 + 1轮压力分析]"
-  local t_test_run="正在进行第 %d/2 次静态分析 (此过程约需 15 秒)..."
-  local t_post_rest="${CYAN}第一次测试完成，30 秒冷却中...${RESET}"
-  local t_stress_start="${CYAN}静态分析完成，开始执行压力测试...${RESET}"
-  local t_analysis="--- 最终分析结论 ---"
-  local t_st_report="Steal Time (窃取时间) 峰值: %.2f%%"
-  local t_lat_report="标准测试最大延迟 (Std Latency): %s µs"
-  local t_stress_report="压力测试峰值延迟 (Stress Peak): %d µs"
-  local t_conclusion_st_fail="结论：严重超售 (欺诈级)。检测到显著的 Steal Time (st > 2.0%%)。"
-  local t_conclusion_lat_exc="结论：卓越 (Excellent)。未检测到 Steal Time，且标准延迟极度稳定。"
-  local t_conclusion_lat_good="结论：资源共享 (Shared)。未检测到 Steal Time，但标准延迟存在波动。"
-  local t_conclusion_lat_bad="结论：超售 (Oversold)。未检测到 Steal Time，但标准延迟存在严重抖动。"
-  local t_stress_conclusion_low_impact="$压力结论：性能卓越。高压下的延迟峰值与标准延迟相比，增幅在可控范围内。"
-  local t_stress_conclusion_high_impact="压力结论：性能稳定。高压下的延迟峰值相比标准延迟有显著增加，但未失控。"
-  local t_stress_conclusion_bottleneck="压力结论：性能瓶颈。高压下的延迟峰值相比标准延迟出现指数级增长，已达性能瓶頸。"
-  local t_stress_params="[压力参数: %d个并发线程]"
-  local t_stress_conclusion_abnormal="压力结论：性能反常。高压下的延迟峰值反常地低于标准延迟，可能存在QoS限制或其他性能调度问题。"
-  ;;
-us)
-  local t_title="## CPU Honesty Test"
-  local t_start="${CYAN}Starting CPU Honesty Test...${RESET}"
-  local t_params="[Parameters: 2 rounds of static analysis, Prio 80, Interval 500µs]"
-  local t_test_run="Running static analysis %d/2 (this takes about 15 seconds)..."
-  local t_post_rest="${CYAN}First run complete, cooling down for 30 seconds...${RESET}"
-  local t_analysis="--- Final Analysis Conclusion ---"
-  local t_st_report="Peak Steal Time: %.2f%%"
-  local t_lat_report="Max Kernel Latency: %s µs"
-  local t_stress_report="Stress Peak: %d µs"
-  local t_conclusion_st_fail="Conclusion: Severe Overselling (Fraudulent-level). Significant Steal Time (st > 2.0%%) detected. This indicates the Hypervisor fails to provide basic CPU time guarantees."
-  local t_conclusion_lat_exc="Conclusion: Excellent. No Steal Time detected, and kernel latency is extremely stable."
-  local t_conclusion_lat_good="Conclusion: Shared Resources. No Steal Time detected, but kernel latency shows minor fluctuations, indicating resource sharing."
-  local t_conclusion_lat_bad="Conclusion: Oversold. No Steal Time detected, but kernel latency shows severe jitter, indicating significant resource contention."
-  local t_stress_conclusion_low_impact=" Stress Conclusion: Excellent performance. The peak latency under high pressure increases within a manageable range compared to the standard latency."
-  local t_stress_conclusion_high_impact="Stress Conclusion: Stable performance. The peak latency under high pressure increases significantly compared to the standard latency, but remains within control."
+  # --- 多語言文本定義 (整合版) ---
+  case "$lang" in
+  cn)
+    local t_title="## CPU 诚信度与压力测试"
+    local t_start="${CYAN}开始执行 CPU 诚信度与压力综合测试...${RESET}"
+    local t_params="[参数: 2轮静态分析 + 1轮压力分析]"
+    local t_test_run="正在进行第 %d/2 次静态分析 (此过程约需 15 秒)..."
+    local t_post_rest="${CYAN}第一次测试完成，30 秒冷却中...${RESET}"
+    local t_stress_start="${CYAN}静态分析完成，开始执行压力测试...${RESET}"
+    local t_analysis="--- 最终分析结论 ---"
+    local t_st_report="Steal Time (窃取时间) 峰值: %.2f%%"
+    local t_lat_report="标准测试最大延迟 (Std Latency): %s µs"
+    local t_stress_report="压力测试峰值延迟 (Stress Peak): %d µs"
+    local t_conclusion_st_fail="分析：检测到显著的 CPU Steal Time (>2.0%)。这表明 Hypervisor (底层母机) 无法稳定分配所承诺的 CPU 时间，性能会受到不可预测的严重影响。不适用于任何对稳定性有要求的生产环境。"
+    local t_conclusion_lat_exc="分析：内核延迟极低且稳定 (平均 < 1500µs)。性能表现极其稳定，接近实体机水平，CPU 资源几乎无干扰。非常适用于延迟敏感型应用 (如游戏服务器、即时通讯)。"
+    local t_conclusion_lat_good="分析：内核延迟存在轻微波动 (平均 1500µs - 4000µs)。这是典型且健康的共享虚拟化环境。CPU 资源与其他用户共享，存在轻度邻居干扰，适用于网站、博客等通用型应用。"
+    local t_conclusion_lat_bad="分析：内核延迟存在严重抖动 (平均 > 4000µs)。CPU 资源争抢严重，性能一致性差。在负载稍高时可能会出现明显卡顿。适用于离线任务或对性能稳定性要求极低的场景。"
+    local t_stress_conclusion_low_impact="压力结论：性能卓越。高压下的延迟峰值与标准延迟相比，增幅在可控范围内。"
+    local t_stress_conclusion_high_impact="压力结论：性能稳定。高压下的延迟峰值相比标准延迟有显著增加，但未失控。"
+    local t_stress_conclusion_bottleneck="压力结论：性能瓶颈。高压下的延迟峰值相比标准延迟出现指数级增长，已达性能瓶頸。"
+    local t_stress_params="[压力参数: %d个并发线程]"
+    local t_stress_conclusion_abnormal="压力结论：性能反常。高压下的延迟峰值反常地低于标准延迟，可能存在QoS限制或其他性能调度问题。"
+    ;;
+  us)
+    local t_title="## CPU Honesty Test"
+    local t_start="${CYAN}Starting CPU Honesty Test...${RESET}"
+    local t_params="[Parameters: 2 rounds of static analysis, Prio 80, Interval 500µs]"
+    local t_test_run="Running static analysis %d/2 (this takes about 15 seconds)..."
+    local t_post_rest="${CYAN}First run complete, cooling down for 30 seconds...${RESET}"
+    local t_analysis="--- Final Analysis Conclusion ---"
+    local t_st_report="Peak Steal Time: %.2f%%"
+    local t_lat_report="Max Kernel Latency: %s µs"
+    local t_stress_report="Stress Peak: %d µs"
+    local t_conclusion_st_fail="Analysis: Significant CPU Steal Time (>2.0%) was detected. This indicates the Hypervisor is failing to provide the guaranteed CPU time, leading to unpredictable and severe performance degradation. Not suitable for any production environment that requires stability."
+    local t_conclusion_lat_exc="Analysis: Kernel latency is extremely low and stable (average < 1500µs). This indicates near-bare-metal performance with minimal CPU resource interference. Ideal for latency-sensitive applications like game servers or real-time communication."
+    local t_conclusion_lat_good="Analysis: Minor fluctuations in kernel latency were observed (average 1500µs - 4000µs). This is typical of a healthy, shared virtualization environment. Suitable for general-purpose applications like websites and blogs."
+    local t_conclusion_lat_bad="Analysis: Severe jitter in kernel latency was detected (average > 4000µs). This suggests significant CPU resource contention and poor performance consistency. Only suitable for offline tasks or scenarios with very low stability requirements."
+    local t_stress_conclusion_low_impact=" Stress Conclusion: Excellent performance. The peak latency under high pressure increases within a manageable range compared to the standard latency."
+    local t_stress_conclusion_high_impact="Stress Conclusion: Stable performance. The peak latency under high pressure increases significantly compared to the standard latency, but remains within control."
 
-  local t_stress_conclusion_bottleneck="Stress Conclusion: Performance bottleneck. The peak latency under high pressure increases exponentially compared to the standard latency, reaching a performance bottleneck."
-  local t_stress_params="[Stress Parameters: %d concurrent threads]"
-  local t_stress_conclusion_abnormal="Stress Conclusion: Abnormal Performance. Peak latency under high load is abnormally lower than standard latency, suggesting potential QoS throttling or other performance scheduling issues."
-  ;;
-*)
-  local t_title="## CPU 誠信度測試"
-  local t_start="${CYAN}開始執行 CPU 誠信度測試...${RESET}"
-  local t_params="[參數: 2輪靜態分析, 優先級 80, 間隔 500µs]"
-  local t_test_run="正在進行第 %d/2 次靜態分析 (此過程約需 15 秒)..."
-  local t_post_rest="${CYAN}第一次測試完成，30 秒冷卻中...${RESET}"
-  local t_analysis="--- 最終分析結論 ---"
-  local t_st_report="Steal Time (竊取時間) 峰值: %.2f%%"
-  local t_lat_report="最大內核延遲 (Max Latency): %s µs"
-  local t_stress_report="壓力測試峰值延遲 (Stress Peak): %d µs"
-  local t_conclusion_st_fail="結論：嚴重超售 (欺詐級)。檢測到顯著的 Steal Time (st > 2.0%%)，表明 Hypervisor 無法提供基本的 CPU 時間保證。"
-  local t_conclusion_lat_exc="結論：卓越 (Excellent)。未檢測到 Steal Time，且內核延遲表現極度穩定。"
-  local t_conclusion_lat_good="結論：資源共享 (Shared)。未檢測到 Steal Time，但內核延遲存在一定波動，表明存在資源共享。"
-  local t_conclusion_lat_bad="結論：超售 (Oversold)。未檢測到 Steal Time，但內核延遲存在嚴重抖動，表明資源爭搶顯著。"
-  local t_stress_conclusion_low_impact="壓力結論：性能卓越。高壓下的延遲峰值與標準延遲相比，增幅在可控範圍內。"
-  local t_stress_conclusion_high_impact="壓力結論：性能穩定。高壓下的延遲峰值相比標準延遲有顯著增加，但未失控。"
-  local t_stress_conclusion_bottleneck="壓力結論：性能瓶頸。高壓下的延遲峰值相比標準延遲出現指數級增長，已達性能瓶頸。"
-  local t_stress_params="[壓力參數: %d個並發線程]"
-  local t_stress_conclusion_abnormal="$壓力結論：性能反常。高壓下的延遲峰值反常地低於標準延遲，可能存在QoS限制或其他性能調度問題。"
-  ;;
-esac
+    local t_stress_conclusion_bottleneck="Stress Conclusion: Performance bottleneck. The peak latency under high pressure increases exponentially compared to the standard latency, reaching a performance bottleneck."
+    local t_stress_params="[Stress Parameters: %d concurrent threads]"
+    local t_stress_conclusion_abnormal="Stress Conclusion: Abnormal Performance. Peak latency under high load is abnormally lower than standard latency, suggesting potential QoS throttling or other performance scheduling issues."
+    ;;
+  *)
+    local t_title="## CPU 誠信度測試"
+    local t_start="${CYAN}開始執行 CPU 誠信度測試...${RESET}"
+    local t_params="[參數: 2輪靜態分析, 優先級 80, 間隔 500µs]"
+    local t_test_run="正在進行第 %d/2 次靜態分析 (此過程約需 15 秒)..."
+    local t_post_rest="${CYAN}第一次測試完成，30 秒冷卻中...${RESET}"
+    local t_analysis="--- 最終分析結論 ---"
+    local t_st_report="Steal Time (竊取時間) 峰值: %.2f%%"
+    local t_lat_report="最大內核延遲 (Max Latency): %s µs"
+    local t_stress_report="壓力測試峰值延遲 (Stress Peak): %d µs"
+    local t_conclusion_st_fail="分析：檢測到顯著的 CPU Steal Time (>2.0%)。這表明 Hypervisor (底層母機) 無法穩定分配所承諾的 CPU 時間，性能會受到不可預測的嚴重影響。不適用於任何對穩定性有要求的生產環境。"
+    local t_conclusion_lat_exc="結論：分析：內核延遲極低且穩定 (平均 < 1500µs)。性能表現極其穩定，接近實體機水平，CPU 資源幾乎無干擾。非常適用於延遲敏感型應用 (如遊戲伺服器、即時通訊)。"
+    local t_conclusion_lat_good="分析：內核延遲存在輕微波動 (平均 1500µs - 4000µs)。這是典型且健康的共享虛擬化環境。CPU 資源與其他用戶共享，存在輕度鄰居干擾，適用於網站、部落格等通用型應用。"
+    local t_conclusion_lat_bad="分析：內核延遲存在嚴重抖動 (平均 > 4000µs)。CPU 資源爭搶嚴重，性能一致性差。在負載稍高時可能會出現明顯卡頓。適用於離線任務或對性能穩定性要求極低的場景。"
+    local t_stress_conclusion_low_impact="壓力結論：性能卓越。高壓下的延遲峰值與標準延遲相比，增幅在可控範圍內。"
+    local t_stress_conclusion_high_impact="壓力結論：性能穩定。高壓下的延遲峰值相比標準延遲有顯著增加，但未失控。"
+    local t_stress_conclusion_bottleneck="壓力結論：性能瓶頸。高壓下的延遲峰值相比標準延遲出現指數級增長，已達性能瓶頸。"
+    local t_stress_params="[壓力參數: %d個並發線程]"
+    local t_stress_conclusion_abnormal="壓力結論：性能反常。高壓下的延遲峰值反常地低於標準延遲，可能存在QoS限制或其他性能調度問題。"
+    ;;
+  esac
 
   echo -e "\n$t_start"
   echo "$t_params"
@@ -774,10 +830,12 @@ esac
     printf "$t_st_report\n" "$peak_st_value"
     printf "$t_lat_report\n" "${latencies_str% }"
     printf "$t_stress_report\n" "$stress_peak_latency"
+    echo ""
     echo "---"
-    echo -e "$honesty_conclusion"
-    echo -e "$stress_conclusion"
-  } >> "$report"
+    echo ""
+    echo -e "**$honesty_conclusion**"
+    echo -e "**$stress_conclusion**"
+  } > "$report"
 }
 
 ip_quality() {
@@ -1095,8 +1153,9 @@ regional_speedtest() {
   local server_city="$1"
   local RESULT_DIR="$HOME/result"
   local output_file="${RESULT_DIR}/regional_net.txt"
-  local country_code=$(curl -s --max-time 3 https://ipapi.co/country_code/)
-  local continent_code=$(curl -s --max-time 3 https://ipapi.co/continent_code/)
+  local info=$(curl -s --max-time 4 "https://ipwho.is/?fields=country_code,continent_code")
+  local continent_code=$(echo "$info" | jq -r '.continent_code')
+  local country_code=$(echo "$info" | jq -r '.country_code')
   if [ -z "$country_code" ] || [ -z "$continent_code" ]; then
     echo -e "${YELLOW}$regional_speedtest_1${RESET}"
     return
@@ -1321,7 +1380,7 @@ aria2_test(){
   esac
   
   bash <(curl -Ls https://gitlab.com/gebu8f/sh/-/raw/main/testing_server/final_judgement.sh) $final_lang_param | \
-  tee >(sed -n '/^------------------------------------------------------------------$/,$p' >> "$report_file")
+  tee >(sed -n '/^------------------------------------------------------------------$/,$p' > "$report_file")
 
   echo ""
   echo "$t_complete"
@@ -1334,7 +1393,6 @@ all_report() {
   case "$lang" in
     cn)
       local t_basic="## 基础信息"
-      local t_hardware="## 硬体"
       local t_ip_quality="## IP质量"
       local t_net_quality="## 网路质量"
       local t_streaming="## 流媒体"
@@ -1351,7 +1409,6 @@ all_report() {
       ;;
     us)
       local t_basic="## Basic Information"
-      local t_hardware="## Hardware"
       local t_ip_quality="## IP Quality"
       local t_net_quality="## Network Quality"
       local t_streaming="## Streaming"
@@ -1368,7 +1425,6 @@ all_report() {
       ;;
     *)
       local t_basic="## 基礎信息"
-      local t_hardware="## 硬體"
       local t_ip_quality="## IP質量"
       local t_net_quality="## 網路質量"
       local t_streaming="## 流媒體"
@@ -1387,7 +1443,6 @@ all_report() {
 
   echo "$t_basic" >> $report
   echo "[IMG 1]" >> $report
-  echo "$t_hardware" >> $report
   cat $RESULT_DIR/hardware.txt >> $report
   echo "$t_ip_quality" >> $report
   echo "[IMG 2]" >> $report
@@ -1395,9 +1450,9 @@ all_report() {
   echo "[IMG 3]" >> $report 
   if [ "$lang" == "cn" ]; then
     echo "## 路由追踪" >> $report
-    echo "[图片4]" >> $report 
+    echo "[IMG 4]" >> $report 
     echo "$t_streaming" >> $report
-    echo "[图片5]" >> $report
+    echo "[IMG 5]" >> $report
   else
     echo "$t_streaming" >> $report
     echo "[IMG 4]" >> $report
@@ -1445,6 +1500,25 @@ do_speedtest=false
 do_ping=false
 do_stability=false
 do_oversell=false
+# 在你的參數解析 while 循環之前
+if [[ "$1" == "--install" ]]; then
+  echo "Setting up 'mb' command..."
+  # 創建上面那個迷你啟動器的內容
+  LAUNCHER_CONTENT='#!/bin/bash\nSOURCE_URL="https://gitlab.com/gebu8f/sh/-/raw/main/testing_server/test.sh"\nexec bash <(curl -sL "$SOURCE_URL") "$@"'
+  
+  echo -e "$LAUNCHER_CONTENT" | sudo tee /usr/local/bin/mb > /dev/null
+  chmod +x /usr/local/bin/mb
+  
+  # 檢查是否成功
+  if command -v mb &> /dev/null; then
+    echo "Success! You can now use 'mb' command globally."
+    echo "Example: mb -oversell"
+  else
+    echo "Failed to set up 'mb' command."
+  fi
+  exit 0 # 完成安裝後退出
+fi
+
 # --- 參數解析 ---
 while [[ $# -gt 0 ]]; do
   case "$1" in
