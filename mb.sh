@@ -317,7 +317,7 @@ ecs_download() {
   # 6. 刪除壓縮檔
   rm "$ZIPPED_FILE_PATH"
 }
-ecs_simple_static() {
+ecs_simple_static() (
   local EXECUTABLE_PATH="$TEMP_WORKDIR/goecs"
   local RESULT_DIR="$HOME/result"
   local TEMP_HTML="$TEMP_WORKDIR/temp.html"
@@ -392,7 +392,7 @@ ecs_simple_static() {
     "$TEMP_HTML" \
     "$FINAL_IMAGE_FILE" >/dev/null 2>&1
     compress_png "$FINAL_IMAGE_FILE"
-}
+)
 
 hardware_benchmarks() (
   # --- 設定 ---
