@@ -19,7 +19,7 @@
 ```bash
 bash <(curl -sL https://gitlab.com/gebu8f/sh/-/raw/main/testing_server/mb.sh)
 ```
-> **注意:** 首次運行或伺服器環境極簡時，腳本會自動安裝必要的工具（如 `curl`, `jq`, `wkhtmltoimage` 等），這可能需要一些時間。
+> **注意:** 首次運行或伺服器環境極簡時，腳本會自動安裝必要的工具（如 `curl`, `jq`, `wkhtmltoimage` 等），這可能需要一些時間。**不支持僅IPV6**需至少有ipv4
 
 ## 🛠️ 選項與參數
 
