@@ -33,7 +33,7 @@ YELLOW='\033[1;33m'  # ⚠️ 警告用黃色
 CYAN="\033[1;36m"    # ℹ️ 一般提示用青色
 RESET='\033[0m'      # 清除顏色
 
-version="v2025.10.21"
+version="v2025.10.22"
 
 lang(){
   # 語言設定函式 - 目前使用命令行參數控制
@@ -110,142 +110,143 @@ check_system(){
       echo -e "${RED}$check_system_1${RESET}"
       exit 1
     fi
-  elif command -v apk >/dev/null 2>&1; then
-    system=3
    else
     echo -e "${RED}不支援的系統。(Unsupported system.)${RESET}" >&2
     exit 1
   fi
 }
-install_wkhtmltox_manual() {
-    # C 計劃第一步：手動處理 libssl1.1 這個最關鍵的依賴
-    # 檢查系統是否缺少 libssl1.1
-    if ! dpkg -l | grep -q "libssl1.1"; then
-        echo -e "${YELLOW}System is missing libssl1.1, a dependency for wkhtmltopdf. Attempting to install it manually...${RESET}"
-        
-        local ARCH=$(uname -m)
-        local LIBSSL_URL=""
-        
-        if [ "$ARCH" = "x86_64" ]; then
-            # 從 Debian 11 (Bullseye) 的官方倉庫獲取，這是最穩定的來源
-            LIBSSL_URL="http://ftp.us.debian.org/debian/pool/main/o/openssl/libssl1.1_1.1.1w-0+deb11u1_amd64.deb"
-        elif [ "$ARCH" = "aarch64" ]; then
-            LIBSSL_URL="http://ftp.us.debian.org/debian/pool/main/o/openssl/libssl1.1_1.1.1w-0+deb11u1_arm64.deb"
-        fi
+install_wkhtmltox() {
+  local ARCH=$(uname -m)
+  local TEMP_WORKDIR="/tmp/wkhtmltox_install"
+  mkdir -p "$TEMP_WORKDIR"
 
-        if [ -n "$LIBSSL_URL" ]; then
-            local LIBSSL_PATH="$TEMP_WORKDIR/libssl1.1.deb"
-            echo -e "${CYAN}Downloading libssl1.1 from $LIBSSL_URL...${RESET}"
-            if curl -sL -o "$LIBSSL_PATH" "$LIBSSL_URL"; then
-                dpkg -i "$LIBSSL_PATH"
-            else
-                echo -e "${RED}Failed to download libssl1.1 package.${RESET}"
-                return 1 # 返回失敗
-            fi
-        else
-            echo -e "${RED}Unsupported architecture for manual libssl1.1 installation: $ARCH${RESET}"
-            return 1 # 返回失敗
-        fi
-    fi
-
-    # C 計劃第二步：現在 libssl1.1 已經就位，可以安全地安裝 wkhtmltox 了
-    echo -e "${CYAN}Proceeding with manual installation of wkhtmltopdf...${RESET}"
-    local WK_VER="0.12.6-1"
-    local ARCH=$(uname -m)
-    local DEB_URL=""
-
-    if [ "$ARCH" = "x86_64" ]; then
-        DEB_URL="https://github.com/wkhtmltopdf/packaging/releases/download/${WK_VER}/wkhtmltox_${WK_VER}.buster_amd64.deb"
-    elif [ "$ARCH" = "aarch64" ]; then
-        DEB_URL="https://github.com/wkhtmltopdf/packaging/releases/download/${WK_VER}/wkhtmltox_${WK_VER}.buster_arm64.deb"
+  # --- 判斷發行版類型 ---
+  if [ -f /etc/fedora-release ]; then
+    yum install -y "https://github.com/wkhtmltopdf/packaging/releases/download/0.12.6.1-3/wkhtmltox-0.12.6.1-3.fedora37.x86_64.rpm"
+  elif [ -f /etc/redhat-release ]; then
+    local RHEL_VER=$(grep -oE '[0-9]+' /etc/redhat-release | head -n1)
+    if [ "$RHEL_VER" -ge 9 ]; then
+      RHEL_VER=9
     else
-        echo -e "${RED}Unsupported architecture for manual wkhtmltopdf installation: $ARCH${RESET}"
-        return 1 # 返回失敗
+      RHEL_VER=8
+    fi
+    # 下載 RPM 安裝包
+    local RPM_URL="https://github.com/wkhtmltopdf/packaging/releases/download/0.12.6.1-3/wkhtmltox-0.12.6.1-3.almalinux$.$ARCH.rpm"
+        local RPM_PATH="$TEMP_WORKDIR/wkhtmltox.rpm"
+
+    if yum install -y $RPM_URL; then
+      echo -e "${GREEN}wkhtmltox installed successfully on CentOS/AlmaLinux.${RESET}"
+    else
+      echo -e "${RED}Failed to download wkhtmltox RPM package.${RESET}"
+      exit 1
+    fi
+  else
+    if ! dpkg -l | grep -q "libssl1.1"; then
+      local LIBSSL_URL=""
+      if [ "$ARCH" = "x86_64" ]; then
+        LIBSSL_URL="https://ftp.us.debian.org/debian/pool/main/o/openssl/libssl1.1_1.1.1w-0+deb11u1_amd64.deb"
+      elif [ "$ARCH" = "aarch64" ]; then
+        LIBSSL_URL="https://ftp.us.debian.org/debian/pool/main/o/openssl/libssl1.1_1.1.1w-0+deb11u1_arm64.deb"
+      fi
+      if [ -n "$LIBSSL_URL" ]; then
+        local LIBSSL_PATH="$TEMP_WORKDIR/libssl1.1.deb"
+        curl -sL -o "$LIBSSL_PATH" "$LIBSSL_URL" && dpkg -i "$LIBSSL_PATH"
+      fi
+    fi
+    # 安裝 wkhtmltox 主體
+    local WK_VER="0.12.6-1"
+    local DEB_URL=""
+    if [ "$ARCH" = "x86_64" ]; then
+      DEB_URL="https://github.com/wkhtmltopdf/packaging/releases/download/${WK_VER}/wkhtmltox_${WK_VER}.buster_amd64.deb"
+    elif [ "$ARCH" = "aarch64" ]; then
+      DEB_URL="https://github.com/wkhtmltopdf/packaging/releases/download/${WK_VER}/wkhtmltox_${WK_VER}.buster_arm64.deb"
     fi
 
     if [ -n "$DEB_URL" ]; then
-        local DEB_PATH="$TEMP_WORKDIR/wkhtmltox.deb"
-        echo -e "${CYAN}Downloading from $DEB_URL...${RESET}"
-        if curl -sL -o "$DEB_PATH" "$DEB_URL"; then
-            # 使用 dpkg 安裝, 它可能會抱怨其他依賴, 但最關鍵的 libssl1.1 已經解決
-            dpkg -i "$DEB_PATH"
-            # 讓 apt 來解決剩下的所有常規依賴 (如 libxrender1, xfonts 等)
-            echo -e "${CYAN}Fixing remaining dependencies...${RESET}"
-            apt-get -f install -y
-        else
-            echo -e "${RED}Failed to download wkhtmltopdf package.${RESET}"
-            return 1 # 返回失敗
-        fi
+      local DEB_PATH="$TEMP_WORKDIR/wkhtmltox.deb"
+      if curl -sL -o "$DEB_PATH" "$DEB_URL"; then
+        dpkg -i "$DEB_PATH" || apt -f install -y
+        echo -e "${GREEN}wkhtmltox installed successfully on Debian/Ubuntu.${RESET}"
+      else
+        echo -e "${RED}Failed to download wkhtmltox DEB package.${RESET}"
+                return 1
+      fi
     fi
-    return 0 # 返回成功
+  fi
+  return 0
 }
 
+
 check_app(){
-  # --- 基礎工具安裝 (優化後) ---
-  local missing_pkgs=()
-  declare -A pkg_map
-  pkg_map=( ["stress-ng"]="stress-ng" ["sar"]="sysstat" ["curl"]="curl" ["jq"]="jq" ["unzip"]="unzip" ["fc-list"]="fontconfig" )
-  pkg_map["script"]=$([[ "$system" -eq 1 ]] && echo "bsdutils" || echo "util-linux")
-  
+  # 根據系統選擇 script 對應套件
+  if [ "$system" -eq 1 ]; then
+    pkg_script="bsdutils"
+  else
+    pkg_script="util-linux"
+  fi
+
+  # 定義指令與套件對應關係
+  declare -A pkg_map=(
+    ["stress-ng"]="stress-ng"
+    ["sar"]="sysstat"
+    ["curl"]="curl"
+    ["jq"]="jq"
+    ["unzip"]="unzip"
+    ["fc-list"]="fontconfig"
+    ["script"]="$pkg_script"
+    ["aha"]="aha"
+    ["pngquant"]="pngquant"
+    ["bc"]="bc"
+    ["cyclictest"]="rt-tests"
+    ["sysbench"]="sysbench"
+  )
+  if [ $system == 2 ]; then
+    if ! yum repolist enabled | grep -q "epel"; then
+      yum install -y epel-release
+    fi
+  fi
+
+  # 逐一檢查並安裝
   for cmd in "${!pkg_map[@]}"; do
-    if ! command -v "$cmd" &> /dev/null; then
-      missing_pkgs+=("${pkg_map[$cmd]}")
+    if ! command -v "$cmd" >/dev/null 2>&1; then
+      pkg="${pkg_map[$cmd]}"
+      case "$system" in
+      1) apt update -qq && apt install -y "$pkg" ;;
+      2) yum install -y "$pkg" ;;
+      esac
     fi
   done
-
-  if [ ${#missing_pkgs[@]} -gt 0 ]; then
-    case $system in
-      1) apt-get update -qq && apt-get install -y "${missing_pkgs[@]}" ;;
-      2) yum install -y "${missing_pkgs[@]}" ;;
-      3) apk add --no-cache "${missing_pkgs[@]}" ;;
-    esac
-  fi
   
   # --- Emoji 字體安裝 ---
   if ! fc-list | grep -qi "NotoColorEmoji"; then
     echo -e "${CYAN}Installing Noto Color Emoji font...${RESET}"
     case $system in
-      1) apt-get install -y fonts-noto-color-emoji ;;
-      2) [[ ! $(yum repolist enabled | grep "epel") ]] && yum install -y epel-release; yum install -y google-noto-emoji-color-fonts ;;
-      3) apk add --no-cache font-noto-emoji ;;
+      1) apt install -y fonts-noto-color-emoji ;;
+      2)
+        yum install -y epel-release
+        yum install -y google-noto-emoji-color-fonts
+        ;;
     esac
   fi
-
-  # --- 圖片處理與截圖工具安裝 (終極改造版) ---
-  local install_needed=false
-  for cmd in pngquant wkhtmltoimage aha; do
-    if ! command -v "$cmd" &>/dev/null; then
-      install_needed=true
-      break
-    fi
-  done
-  
-  if $install_needed; then
-    local img_tools=("aha" "pngquant")
-    # 對於 CentOS/RHEL 系統, 確保 EPEL 源已啟用
-    if [[ "$system" -eq 2 ]] && ! yum repolist enabled | grep -q "epel"; then
-      yum install -y epel-release
-    fi
-
+  if ! fc-list | grep -qi "wqy-zenhei"; then
     case $system in
-    1) apt-get install -y "${img_tools[@]}" wkhtmltopdf ;;
-    2) yum install -y "${img_tools[@]}" wkhtmltopdf ;;
-    3) apk add --no-cache "${img_tools[@]}" wkhtmltopdf ;;
+      1) apt-get install -y fonts-wqy-zenhei ;;
+      2) yum install -y wqy-zenhei-fonts ;; # 在 CentOS/RHEL 上的包名不同
+      3) apk add --no-cache font-wqy-zenhei ;;
     esac
-
-    if ! command -v "wkhtmltoimage" &> /dev/null; then
-      if [[ "$system" -eq 1 ]]; then
-        install_wkhtmltox_manual
-      else
-        echo -e "${RED}Package manager failed to install wkhtmltopdf on this non-Debian system. Manual installation is not supported.${RESET}"
-      fi
-    fi
   fi
-    
-  # --- 最終檢查 ---
-  if ! command -v "wkhtmltoimage" &> /dev/null; then
-    echo -e "${RED}FATAL: wkhtmltoimage could not be installed. Image report generation is not possible.${RESET}"
-    exit 1
+  if ! command -v wkhtmltoimage >/dev/null 2>&1; then
+    case $system in
+    1)
+      apt install -y wkhtmltopdf
+      ;;
+    2)
+      yum install -y wkhtmltopdf
+      ;;
+    esac
+    if ! command -v "wkhtmltoimage" &> /dev/null; then
+      install_wkhtmltox_manual
+    fi
   fi
 }
 compress_png() {
@@ -400,6 +401,8 @@ hardware_benchmarks() (
   local EXECUTABLE_PATH="${ECS_DIR}/goecs"
   local RESULT_DIR="$HOME/result"
   local RESULT_FILE="${RESULT_DIR}/hardware.txt"
+  local cpu_count
+  cpu_count=$(nproc)
 
 
   # --- 步驟 1: 檢查 goecs 執行檔 ---
@@ -510,8 +513,12 @@ hardware_benchmarks() (
 
   {
     echo "$t_cpu_sys"
-    echo "${t_single}：${sys_single_score:-N/A}"
-    echo "${t_multi}：${sys_multi_score:-N/A}"
+    if [ "$cpu_count" -eq 1 ]; then
+      echo "${t_single}：${sys_single_score:-N/A}"
+    else
+      echo "${t_single}：${sys_single_score:-N/A}"
+      echo "${t_multi}：${sys_multi_score:-N/A}"
+    fi
     echo ""
     echo "$t_cpu_gb6"
     echo "${t_single}：${gb6_single_score:-N/A}"
@@ -527,7 +534,7 @@ hardware_benchmarks() (
     echo "| $t_read | ${disk_r_4k:-N/A} | ${disk_r_64k:-N/A} | ${disk_r_512k:-N/A} | ${disk_r_1m:-N/A} |"
     echo "| $t_write | ${disk_w_4k:-N/A} | ${disk_w_64k:-N/A} | ${disk_w_512k:-N/A} | ${disk_w_1m:-N/A} |"
     echo "| $t_combined | ${disk_t_4k:-N/A} | ${disk_t_64k:-N/A} | ${disk_t_512k:-N/A} | ${disk_t_1m:-N/A} |"
-  } >> "$RESULT_FILE"
+  } > "$RESULT_FILE"
 )
 cpu_test() {
   local report="$HOME/result/hardware.txt"
@@ -628,7 +635,7 @@ cpu_test() {
     echo '```'
     echo ""
     echo -e "$analysis_summary"
-  } > "$report"
+  } >> "$report"
 }
 cpu_oversell_test() {
   local report="$HOME/result/hardware.txt"
@@ -835,7 +842,7 @@ cpu_oversell_test() {
     echo ""
     echo -e "**$honesty_conclusion**"
     echo -e "**$stress_conclusion**"
-  } > "$report"
+  } >> "$report"
 }
 
 ip_quality() {
