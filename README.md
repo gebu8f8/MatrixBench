@@ -17,7 +17,7 @@
 執行以下指令即可開始全方位體檢。腳本會自動處理所需的依賴安裝。
 
 ```bash
-bash <(curl -sL https://gitlab.com/gebu8f/sh/-/raw/main/testing_server/mb.sh)
+bash <(curl -sL https://mb.gebu8f.com)
 ```
 > **注意:** 首次運行或伺服器環境極簡時，腳本會自動安裝必要的工具（如 `curl`, `jq`, `wkhtmltoimage` 等），這可能需要一些時間。**不支持僅IPV6**需至少有ipv4
 
@@ -69,7 +69,7 @@ bash <(curl -sL https://gitlab.com/gebu8f/sh/-/raw/main/testing_server/mb.sh)
 為了方便使用，你可以執行以下指令，將 `MatrixBench` 安裝為一個全域的 `mb` 指令。這個指令會自動保持最新。
 
 ```bash
-bash <(curl -sL https://gitlab.com/gebu8f/sh/-/raw/main/testing_server/mb.sh) --install
+bash <(curl -sL https://mb.gebu8f.com) --install
 ```
 ## 🙏 致謝 (Acknowledgements)
 
