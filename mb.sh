@@ -33,7 +33,7 @@ YELLOW='\033[1;33m'  # ⚠️ 警告用黃色
 CYAN="\033[1;36m"    # ℹ️ 一般提示用青色
 RESET='\033[0m'      # 清除顏色
 
-version="v2025.10.22"
+version="v2025.10.24"
 
 lang(){
   # 語言設定函式 - 目前使用命令行參數控制
@@ -806,15 +806,21 @@ cpu_oversell_test() {
 
   # 3. 生成「壓力結論」(基於壓力延遲與標準延遲的比較)
   local stress_conclusion
-  
-  if (( $(echo "$stress_peak_latency < $avg_latency" | bc -l) )); then
+
+  # --- [核心修改] ---
+  # 新的觸發邏輯：壓力測試的峰值延遲，必須同時小於兩輪靜態測試的最大延遲，才判定為「性能反常」
+  if [[ ${#max_latencies[@]} -eq 2 ]] && \
+     (( $(echo "$stress_peak_latency < ${max_latencies[0]}" | bc -l) )) && \
+     (( $(echo "$stress_peak_latency < ${max_latencies[1]}" | bc -l) )); then
     stress_conclusion="$t_stress_conclusion_abnormal"
   else
+    # 如果不滿足反常條件，則沿用原有的比例比較邏輯，但基準改為 avg_latency
     local ratio=0
-    if [ $avg_latency -gt 0 ]; then
+    # 確保 avg_latency 大於 0 避免除零錯誤
+    if (( $(echo "$avg_latency > 0" | bc -l) )); then
       ratio=$(echo "scale=2; $stress_peak_latency / $avg_latency" | bc)
     fi
-
+  
     if (( $(echo "$ratio <= 10.0" | bc -l) )); then
       stress_conclusion="$t_stress_conclusion_low_impact"
     elif (( $(echo "$ratio <= 30.0" | bc -l) )); then
