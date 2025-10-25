@@ -71,6 +71,8 @@ bash <(curl -sL https://mb.gebu8f.com)
 ```bash
 bash <(curl -sL https://mb.gebu8f.com) --install
 ```
+## 詳細內容及文章
+https://www.gebu8f.com/matrixbench/
 ## 🙏 致謝 (Acknowledgements)
 
 本專案的順利開發，離不開以下優秀的開源專案和作者，在此表示誠摯的感謝。`MatrixBench` 是在他們的基礎之上，專注於提供更深層次的診斷分析。
