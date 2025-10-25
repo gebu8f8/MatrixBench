@@ -33,7 +33,7 @@ YELLOW='\033[1;33m'  # ⚠️ 警告用黃色
 CYAN="\033[1;36m"    # ℹ️ 一般提示用青色
 RESET='\033[0m'      # 清除顏色
 
-version="v2025.10.24"
+version="v2025.10.25"
 
 lang(){
   # 語言設定函式 - 目前使用命令行參數控制
@@ -1020,51 +1020,58 @@ net_rounting() {
     "$FINAL_IMAGE_FILE" >/dev/null 2>&1
   compress_png $FINAL_IMAGE_FILE
 }
-streaming_unlock() (
-  local EXECUTABLE_PATH="$TEMP_WORKDIR/goecs"
+streaming_unlock() {
   local RAW_ANSI_OUTPUT="${TEMP_WORKDIR}/streaming_report.ansi"
   local TEMP_HTML="${TEMP_WORKDIR}/streaming_report.html"
   local RESULT_DIR="$HOME/result"
   local FINAL_IMAGE_FILE="${RESULT_DIR}/streaming.png"
   
   echo -e "${CYAN}$streaming_unlock_1...${RESET}"
-  
-  if [[ ! -x "$EXECUTABLE_PATH" ]]; then
-      chmod +x "$EXECUTABLE_PATH"
-  fi
 
   mkdir -p "$RESULT_DIR"
 
-  # --- 步驟 2: 執行指令並透過 script 捕捉純淨的 ANSI 輸出 ---
-  cd $TEMP_WORKDIR
-  local command_to_run="$EXECUTABLE_PATH -l zh -menu=false -log=false -ut=true -comm=false -basic=false -cpu=false -disk=false -email=false -memory=false -nt3=false -security=false -speed=false -upload=false -backtrace=false | awk '/跨国流媒体解锁/,/^-+$/'"
+  # 執行指令並捕獲輸出
+  script -qfc "bash <(curl -L -s check.unlock.media) -E en -R 0" /dev/null > "$RAW_ANSI_OUTPUT"
   
-  script -qfc "$command_to_run" /dev/null > "$RAW_ANSI_OUTPUT"
+  # 過濾輸出：從第一個 "** Checking Results Under" 開始，
+  # 直到 "Testing Done!" 的前一行（也就是最後一個 "===" 行）
+  awk '
+    /\*\* Checking Results Under/ { found=1 }
+    found {
+      if (/Testing Done!/) { exit }
+      print
+    }
+  ' "$RAW_ANSI_OUTPUT" > "${RAW_ANSI_OUTPUT}.tmp"
+  
+  # 檢查過濾是否成功，避免後續步驟出錯
+  if [ ! -s "${RAW_ANSI_OUTPUT}.tmp" ]; then
+    echo "過濾日誌失敗，請檢查 RAW_ANSI_OUTPUT 內容和 awk 邏輯。"
+    return 1
+  fi
+  
+  mv "${RAW_ANSI_OUTPUT}.tmp" "$RAW_ANSI_OUTPUT"
+  
   cat "$RAW_ANSI_OUTPUT"
   
-  # --- 步驟 3: 將 ANSI 轉換為 HTML ---
+  # 轉換為 HTML
   aha --title "$streaming_unlock_2" < "$RAW_ANSI_OUTPUT" > "$TEMP_HTML"
 
-  # --- 步驟 4: 注入終極樣式並進行截圖 ---
+  # 注入樣式和截圖（後續代碼保持不變）
   sed -i '/<head>/a \
     <style type="text/css"> \
       body { background-color: #1e1e1e !important; font-family: "DejaVu Sans Mono", "Courier New", monospace; padding: 25px; } \
       pre { color: #d8d8d8; white-space: pre-wrap; word-wrap: break-word; font-size: 14px; line-height: 1.4; } \
-      \
-      /* 覆寫內聯樣式 - 柔和配色 */ \
       span[style*="color:red"] { color: #e06c75 !important; } \
       span[style*="color:green"] { color: #98c379 !important; } \
       span[style*="color:teal"] { color: #56b6c2 !important; } \
       span[style*="color:olive"] { color: #d19a66 !important; } \
       span[style*="color:dimgray"] { color: #5c6370 !important; } \
       span[style*="color:gray"] { color: #abb2bf !important; } \
-      \
-      /* 背景色調整 */ \
       span[style*="background-color:red"] { background-color: #be5046 !important; } \
       span[style*="background-color:green"] { background-color: #5a8a4a !important; } \
       span[style*="background-color:olive"] { background-color: #8a7a3a !important; } \
     <\/style>' "$TEMP_HTML"
-
+    
   wkhtmltoimage \
     --width 800 \
     --quality 100 \
@@ -1072,7 +1079,7 @@ streaming_unlock() (
     "$TEMP_HTML" \
     "$FINAL_IMAGE_FILE" >/dev/null 2>&1
   compress_png $FINAL_IMAGE_FILE
-)
+}
 speedtest_data() {
   local raw_data="$1"
   local server_city="$2" 
@@ -1634,7 +1641,6 @@ else
   fi
 
   if $do_stream; then
-    ecs_download
     streaming_unlock
   fi
 
