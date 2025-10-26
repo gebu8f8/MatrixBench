@@ -33,7 +33,7 @@ YELLOW='\033[1;33m'  # ⚠️ 警告用黃色
 CYAN="\033[1;36m"    # ℹ️ 一般提示用青色
 RESET='\033[0m'      # 清除顏色
 
-version="v2025.10.25"
+version="v2025.10.26"
 
 lang(){
   # 語言設定函式 - 目前使用命令行參數控制
@@ -644,6 +644,7 @@ cpu_oversell_test() {
   # --- 多語言文本定義 (整合版) ---
   case "$lang" in
   cn)
+    local t_warm="系统非空闲 (当前CPU总使用率: %.0f%%)，测试结果可能不准。"
     local t_title="## CPU 诚信度与压力测试"
     local t_start="${CYAN}开始执行 CPU 诚信度与压力综合测试...${RESET}"
     local t_params="[参数: 2轮静态分析 + 1轮压力分析]"
@@ -665,6 +666,7 @@ cpu_oversell_test() {
     local t_stress_conclusion_abnormal="压力结论：性能反常。高压下的延迟峰值反常地低于标准延迟，可能存在QoS限制或其他性能调度问题。"
     ;;
   us)
+    local t_warm="The system is not idle (current total CPU usage: %.0f%%), the test results may be inaccurate."
     local t_title="## CPU Honesty Test"
     local t_start="${CYAN}Starting CPU Honesty Test...${RESET}"
     local t_params="[Parameters: 2 rounds of static analysis, Prio 80, Interval 500µs]"
@@ -686,6 +688,7 @@ cpu_oversell_test() {
     local t_stress_conclusion_abnormal="Stress Conclusion: Abnormal Performance. Peak latency under high load is abnormally lower than standard latency, suggesting potential QoS throttling or other performance scheduling issues."
     ;;
   *)
+    local t_warm="系統非空閒 (當前CPU總使用率: %.0f%%)，測試結果可能不準。"
     local t_title="## CPU 誠信度測試"
     local t_start="${CYAN}開始執行 CPU 誠信度測試...${RESET}"
     local t_params="[參數: 2輪靜態分析, 優先級 80, 間隔 500µs]"
@@ -705,7 +708,12 @@ cpu_oversell_test() {
     local t_stress_params="[壓力參數: %d個並發線程]"
     local t_stress_conclusion_abnormal="壓力結論：性能反常。高壓下的延遲峰值反常地低於標準延遲，可能存在QoS限制或其他性能調度問題。"
     ;;
-  esac
+  local esaccpu_idle=$(mpstat 1 1 | awk '/Average/ {print 100 - $12}')
+  if (( $(echo "$cpu_idle > 10" | bc -l) )); then
+    printf "${YELLOW}"
+    printf "$t_warm" "$cpu_usage"
+    printf "${RESET}\n"
+  fi
 
   echo -e "\n$t_start"
   echo "$t_params"
