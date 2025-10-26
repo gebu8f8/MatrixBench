@@ -9,7 +9,7 @@
 
 *    **独家 CPU 诚信度测试 (核心功能):** 深入分析 `Steal Time` 与压力下的核心延迟，客观评估伺服器的真实稳定性。
 *    **全面硬体性能评测:** 涵盖 CPU (sysbench & Geekbench 6)、记忆体和磁碟 I/O 的综合基准测试。
-*    **IP 与网路品质报告:** 一键生成 IP 质量分析、全球网路速度、延迟和回程路由的图文报告。
+*    **IP 与网络品质报告:** 一键生成 IP 质量分析、全球网络速度、延迟和回程路由的图文报告。
 *    **流媒体解锁能力检测:** 快速检测伺服器解锁各大主流流媒体平台的能力。
 *    **自动化图文报告:** 所有复杂的测试结果，最终都会为你生成易于分享和保存的图片与结构化文本。
 
@@ -32,8 +32,8 @@ bash <(curl -sL https://mb.gebu8f.com) -l cn
 | `-hw`| **硬体专项:** 运行所有硬体相关测试 (基础信息, 跑分, CPU拓扑, CPU 诚信度)|
 | `-oversell`| **核心诊断:** **仅运行**独家的 CPU 诚信度与拓扑分析|
 | `-ip`| **IP 专项:** 仅运行 IP 质量检测|
-| `-nq`| **网路专项:** 仅运行网路质量 (回程路由) 检测|
-| `-nr`| **路由追踪:** 仅运行中国三网路由测试|
+| `-nq`| **网络专项:** 仅运行网络质量 (回程路由) 检测|
+| `-nr`| **路由追踪:** 仅运行中国三网络由测试|
 | `-stream`| **流媒体专项:** 仅运行流媒体解锁测试|
 | `-speedtest`| **测速专项:** 仅运行全球 Speedtest 测速|
 | `-ping`| **延迟专项:** 仅运行 Ping 延迟测试|
@@ -44,7 +44,7 @@ bash <(curl -sL https://mb.gebu8f.com) -l cn
 ```bash
 bash mb.sh -oversell
 ```
-*   **想做一个全面的硬体和网路评测，但不关心流媒体？ **
+*   **想做一个全面的硬体和网络评测，但不关心流媒体？ **
 ```bash
 bash mb.sh -hw -ip -nq -speedtest -ping
 ```
@@ -78,5 +78,5 @@ https://www.gebu8f.com/matrixbench/
 
 *   **[yabs.sh](https://github.com/masonr/yet-another-bench-script):** 提供了业界标准的 Geekbench 和磁碟性能测试引擎。
 *   **[spiritLH/ecs](https://github.com/spiritLH/ecs):** 俗称「融合怪」，我们的系统信息展示、sysbench 逻辑功能深受其启发。
-*   **[xykt (@MoeClub)](https://github.com/MoeClub):** 其创作的 [IP.Check.P​​lace](https://ip.check.place/) (`IPQuality`) 与 [Net.Check.P​​lace](https://net.check.place/) (`NetQuality`) 脚本，为本专案的 IP 和网路质量以及路由追踪分析提供了强大的核心支持。
+*   **[xykt (@MoeClub)](https://github.com/MoeClub):** 其创作的 [IP.Check.P​​lace](https://ip.check.place/) (`IPQuality`) 与 [Net.Check.P​​lace](https://net.check.place/) (`NetQuality`) 脚本，为本专案的 IP 和网络质量以及路由追踪分析提供了强大的核心支持。
 *   **[lmc999/RegionRestrictionCheck](https://github.com/lmc999/RegionRestrictionCheck):** 为我们的流媒体检测提供了强大的核心支持。
