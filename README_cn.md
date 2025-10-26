@@ -77,6 +77,6 @@ https://www.gebu8f.com/matrixbench/
 本专案的顺利开发，离不开以下优秀的开源专案和作者，在此表示诚挚的感谢。 `MatrixBench` 是在他们的基础之上，专注于提供更深层次的诊断分析。
 
 *   **[yabs.sh](https://github.com/masonr/yet-another-bench-script):** 提供了业界标准的 Geekbench 和磁碟性能测试引擎。
-*   **[spiritLH/ecs](https://github.com/spiritLH/ecs):** 俗称「融合怪」，我们的系统信息展示、sysbench 逻辑功能深受其启发。
+*   **[oneclickvirt/ecs](https://github.com/oneclickvirt/ecs):** 俗称「融合怪」，我们的系统信息展示、sysbench 逻辑功能深受其启发。
 *   **[xykt](https://github.com/xykt):** 创作的 `IPQuality` 与 `NetQuality` 脚本，为本专案的 IP 和网络质量以及路由追踪分析提供了强大的核心支持。
 *   **[lmc999/RegionRestrictionCheck](https://github.com/lmc999/RegionRestrictionCheck):** 为我们的流媒体检测提供了强大的核心支持。
