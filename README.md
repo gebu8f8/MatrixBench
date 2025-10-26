@@ -43,7 +43,7 @@ bash mb.sh -oversell
 ```
 * **Want a comprehensive hardware and network review, but don't care about streaming?**
 ```bash
-bash mb.sh -hw -ip -nq -speedtest -ping
+bash mb.sh -hw -ip -speedtest -ping
 ```
 * (You can freely combine multiple parameters)*
 ## 📦 Test Results
