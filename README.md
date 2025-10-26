@@ -36,20 +36,25 @@ By default, MatrixBench performs a comprehensive analysis. Use the following opt
 | `-speedtest` | Runs global network speed tests with Speedtest.net.         |
 | `-ping`      | Measures network latency with multiple Ping tests.          |
 | `-stability` | Assesses network stability with a high-traffic download test. |
-### Usage Examples
+## Usage Examples
 
-* **Just want a quick check to see if the CPU is oversold?**
-```bash
-bash mb.sh -oversell
-```
-* **Want a comprehensive hardware and network review, but don't care about streaming?**
-```bash
-bash mb.sh -hw -ip -speedtest -ping
-```
-* (You can freely combine multiple parameters)*
+*   **To check for CPU overselling:**
+    ```bash
+    bash <(curl...) -oversell
+    ```
+*   **For a full hardware and network audit (excluding streaming tests):**
+    ```bash
+    bash <(curl...) -hw -ip -nq -speedtest -ping
+    ```
+*   **To test only IP quality and streaming access:**
+    ```bash
+    bash <(curl...) -ip -stream
+    ```
+*(Options can be combined freely.)*
+
 ## 📦 Test Results
 
-After all tests are completed, the generated image reports (.png) and text reports (.txt) will be saved in the `result` folder in your home directory (`$HOME/result`).
+Upon completion, all generated reports—including images (`.png`) and text summaries (`.txt`)—are saved to the `$HOME/result` directory.
 
 ```
 /root/
@@ -61,9 +66,9 @@ After all tests are completed, the generated image reports (.png) and text repor
     ├── global_net.txt
     └── report.txt
 ```
-## 🚀 Set as a system command (recommended)
+## 🚀 Install as a Global Command
 
-For ease of use, you can run the following command to install `MatrixBench` as a global `mb` command. This command will automatically stay up to date.
+To run `MatrixBench` from anywhere, install it as a global `mb` command. It will automatically keep itself updated.
 
 ```bash
 bash <(curl -sL https://mb.gebu8f.com) --install
@@ -72,10 +77,9 @@ bash <(curl -sL https://mb.gebu8f.com) --install
 https://www.gebu8f.com/matrixbench/
 ## 🙏 Acknowledgements
 
-The successful development of this project would have been impossible without the following excellent open source projects and authors. We would like to express our sincere gratitude. `MatrixBench` builds on their foundation, focusing on providing deeper diagnostic analysis.
+MatrixBench stands on the shoulders of giants. We extend our sincere credit to the following projects and authors for their foundational work:
 
-* **[yabs.sh](https://github.com/masonr/yet-another-bench-script):** Provides the industry-standard Geekbench and disk performance testing engine.
-* **[spiritLH/ecs](https://github.com/spiritLH/ecs):** Commonly known as the "fusion monster", our system information display and sysbench logic functions are deeply inspired by it.
-* **[xykt (@MoeClub)](https://github.com/MoeClub):** Their [IP.Check.Place](https://ip.check.place/) (`IPQuality`) and [Net.Check.Place](https://net.check.place/) (`NetQuality`) scripts provide powerful core support for IP and network quality analysis in this project.
-* **[lmc999/RegionRestrictionCheck](https://github.com/lmc999/RegionRestrictionCheck):** provides powerful core support for our streaming media detection.
-
+*   **[yabs.sh](https://github.com/masonr/yet-another-bench-script):** For its robust Geekbench and disk performance testing engine.
+*   **[spiritLH/ecs](https://github.com/spiritLH/ecs):** Whose "fusion monster" approach inspired our system information display and sysbench logic.
+*   **[xykt](https://github.com/xykt):** For the powerful IP (`IP.Check.Place`) and network (`Net.Check.Place`) quality analysis scripts.
+*   **[lmc999/RegionRestrictionCheck](https://github.com/lmc999/RegionRestrictionCheck):** For providing the core engine for our streaming unlock tests.
