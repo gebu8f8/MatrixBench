@@ -1,4 +1,5 @@
 # MatrixBench (MB) — 伺服器「誠信度」檢測專家
+[简体中文](https://github.com/gebu8f8/MatrixBench/blob/main/README_cn.md)   [English](https://github.com/gebu8f8/MatrixBench/blob/main/README.md)
 
 這不僅僅是又一個跑分腳本，它是一個**伺服器健康診斷儀**，旨在將模糊的「卡頓感」轉化為清晰、客觀的數據。
 
@@ -46,7 +47,7 @@ bash <(curl -sL https://mb.gebu8f.com)
     ```
 *   **想做一個全面的硬體和網路評測，但不關心流媒體？**
     ```bash
-    bash mb.sh -hw -ip -nq -speedtest -ping
+    bash mb.sh -hw -ip -speedtest -ping
     ```
     *(你可以自由組合多個參數)*
 
@@ -73,7 +74,7 @@ bash <(curl -sL https://mb.gebu8f.com) --install
 ```
 ## 詳細內容及文章
 https://www.gebu8f.com/matrixbench/
-## 🙏 致謝 (Acknowledgements)
+## 🙏 致謝
 
 本專案的順利開發，離不開以下優秀的開源專案和作者，在此表示誠摯的感謝。`MatrixBench` 是在他們的基礎之上，專注於提供更深層次的診斷分析。
 
