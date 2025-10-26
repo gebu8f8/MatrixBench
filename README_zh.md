@@ -80,5 +80,5 @@ https://www.gebu8f.com/matrixbench/
 
 *   **[yabs.sh](https://github.com/masonr/yet-another-bench-script):** 提供了業界標準的 Geekbench 和磁碟性能測試引擎。
 *   **[spiritLH/ecs](https://github.com/spiritLH/ecs):** 俗稱「融合怪」，我們的系統信息展示、sysbench 邏輯功能深受其啟發。
-*   **[xykt (@MoeClub)](https://github.com/MoeClub):** 其創作的 [IP.Check.Place](https://ip.check.place/) (`IPQuality`) 與 [Net.Check.Place](https://net.check.place/) (`NetQuality`) 腳本，為本專案的 IP 和網路質量分析提供了強大的核心支持。
+*   **[xykt](https://github.com/xykt):** 其創作的 `IPQuality` 與 `NetQuality` 腳本，為本專案的 IP 和網路質量分析提供了強大的核心支持。
 * **[lmc999/RegionRestrictionCheck](https://github.com/lmc999/RegionRestrictionCheck):** 為我們的流媒體檢測提供了強大的核心支持。
