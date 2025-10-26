@@ -25,16 +25,16 @@ bash <(curl -sL https://mb.gebu8f.com) -l en
 By default, the script executes all tests. You can use the following parameters to run specific test modules to save time.
 
 | Parameter | Description |
-| :--------------- | :----------------------------------------------- |
-| `-l <lang>` | Set the script language (`cn` for Simplified Chinese, `en` for English, leaving it unselected is Traditional Chinese) |
-| `-hw` | **Hardware-specific:** Run all hardware-related tests (basic information, benchmarks, CPU topology, CPU integrity) |
-| `-oversell` | **Core diagnostics:** **Only run** exclusive CPU integrity and topology analysis |
-| `-ip` | **IP-specific:** Run only IP quality testing |
-| `-nq` | **Network-specific:** Run only network quality (backhaul) testing |
-| `-stream` | **Streaming-specific:** Run only streaming unblocking tests |
-| `-speedtest` | **Speedtest-specific:** Run only global Speedtest speed tests |
-| `-ping` | **Latency-specific:** Run only the Ping latency test |
-| `-stability` | **Stability-specific:** Run the aria2c high-speed download stability test |
+| :--- |:--- |
+|`-l <lang>`| Set the script language (`cn` for Simplified Chinese, `en` for English, leaving it unselected is Traditional Chinese) |
+|`-hw`| **Hardware-specific:** Run all hardware-related tests (basic information, benchmarks, CPU topology, CPU integrity) |
+|`-oversell`| **Core diagnostics:** **Only run** exclusive CPU integrity and topology analysis |
+|`-ip`| **IP-specific:** Run only IP quality testing |
+|`-nq`| **Network-specific:** Run only network quality (backhaul) testing |
+|`-stream`| **Streaming-specific:** Run only streaming unblocking tests |
+|`-speedtest`| **Speedtest-specific:** Run only global Speedtest speed tests |
+|`-ping`| **Latency-specific:** Run only the Ping latency test |
+|`-stability`| **Stability-specific:** Run the aria2c high-speed download stability test |
 ### Usage Examples
 
 * **Just want a quick check to see if the CPU is oversold?**
