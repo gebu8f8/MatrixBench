@@ -29,15 +29,15 @@ bash <(curl -sL https://mb.gebu8f.com) -l cn
 | 参数 | 说明 |
 | :--- | :--- |
 | `-l <lang>`| 设定脚本语言 (`cn` 为简体中文, `us` 为英文 , 不选就是繁体中文)|
-| `-hw`| **硬体专项:** 运行所有硬体相关测试 (基础信息, 跑分, CPU拓扑, CPU 诚信度)|
-| `-oversell`| **核心诊断:** **仅运行**独家的 CPU 诚信度与拓扑分析|
-| `-ip`| **IP 专项:** 仅运行 IP 质量检测|
-| `-nq`| **网络专项:** 仅运行网络质量 (回程路由) 检测|
-| `-nr`| **路由追踪:** 仅运行中国三网络由测试|
-| `-stream`| **流媒体专项:** 仅运行流媒体解锁测试|
-| `-speedtest`| **测速专项:** 仅运行全球 Speedtest 测速|
-| `-ping`| **延迟专项:** 仅运行 Ping 延迟测试|
-| `-stability`| **稳定性专项:** 运行 aria2c 大流量下载稳定性测试|
+| `-hw`| 运行所有硬体相关测试 (基础信息, 跑分, CPU拓扑, CPU 诚信度)|
+| `-oversell`| **运行独家的 CPU 诚信度与拓扑分析**|
+| `-ip`| 运行 IP 质量检测|
+| `-nq`| 运行网络质量 (回程路由) 检测|
+| `-nr`| 运行中国三网络由测试|
+| `-stream`| 运行流媒体解锁测试|
+| `-speedtest`| 运行全球 Speedtest 测速|
+| `-ping`| 运行 Ping 延迟测试|
+| `-stability`| 运行 aria2c 大流量下载稳定性测试|
 ### 使用范例
 
 *   **只想快速检查 CPU 是否超售？ **
@@ -78,5 +78,5 @@ https://www.gebu8f.com/matrixbench/
 
 *   **[yabs.sh](https://github.com/masonr/yet-another-bench-script):** 提供了业界标准的 Geekbench 和磁碟性能测试引擎。
 *   **[spiritLH/ecs](https://github.com/spiritLH/ecs):** 俗称「融合怪」，我们的系统信息展示、sysbench 逻辑功能深受其启发。
-*   **[xykt (@MoeClub)](https://github.com/MoeClub):** 其创作的 [IP.Check.P​​lace](https://ip.check.place/) (`IPQuality`) 与 [Net.Check.P​​lace](https://net.check.place/) (`NetQuality`) 脚本，为本专案的 IP 和网络质量以及路由追踪分析提供了强大的核心支持。
+*   **[xykt](https://github.com/xykt):** 创作的 `IPQuality` 与 `NetQuality` 脚本，为本专案的 IP 和网络质量以及路由追踪分析提供了强大的核心支持。
 *   **[lmc999/RegionRestrictionCheck](https://github.com/lmc999/RegionRestrictionCheck):** 为我们的流媒体检测提供了强大的核心支持。
