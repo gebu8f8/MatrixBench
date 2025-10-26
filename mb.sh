@@ -587,56 +587,69 @@ cpu_test() {
 
   echo "$t_start"
 
-  # 執行 lscpu -e 並捕獲其輸出
-  local lscpu_output
-  lscpu_output=$(lscpu -e 2>/dev/null)
+  local lscpu_human_output=$(lscpu -e 2>/dev/null)
+  # 為機器分析獲取一個包含所有信息的、穩定的解析格式
+  local lscpu_parse_output=$(lscpu --all --parse=CPU,CORE,SOCKET,NODE 2>/dev/null)
 
-  if [ -z "$lscpu_output" ]; then
+  if [ -z "$lscpu_human_output" ] || [ -z "$lscpu_parse_output" ]; then
     echo "$t_error"
-    return 1
+    exit 1
   fi
 
   # 1. 在終端顯示原始輸出
   echo "--- $t_output ---"
-  echo "$lscpu_output"
+  echo "$lscpu_human_output"
   echo "--------------------------"
 
-  # 2. 進行分析
-  local data_lines=$(echo "$lscpu_output" | tail -n +2)
-  local logical_cores=$(echo "$data_lines" | grep -c .)
-  local sockets=$(echo "$data_lines" | awk '{print $3}' | sort -u | wc -l)
-  local physical_cores=$(echo "$data_lines" | awk '{print $3, $4}' | sort -u | wc -l)
+  # --- [最終方案] 第二步：基於 --parse 格式進行絕對可靠的分析 ---
+  local data_lines=$(echo "$lscpu_parse_output" | grep -v '^#')
 
+  # 1. 邏輯核心數 (總行數)
+  local logical_cores=$(echo "$data_lines" | wc -l)
+  logical_cores=${logical_cores:-0}
+
+  # 2. 插槽數 (唯一的SOCKET列)
+  local sockets=$(echo "$data_lines" | cut -d, -f3 | sort -u | wc -l)
+  sockets=${sockets:-0}
+
+  # 3. 物理核心數 (唯一的CORE,SOCKET組合)
+  local physical_cores=$(echo "$data_lines" | cut -d, -f2,3 | sort -u | wc -l)
+  physical_cores=${physical_cores:-0}
+  
+  # 4. 超線程判斷 (絕對可靠)
   local ht_status="$t_disabled"
-  if [ "$logical_cores" -gt "$physical_cores" ]; then
+  if (( logical_cores > 0 && physical_cores > 0 && logical_cores > physical_cores )); then
     ht_status="$t_enabled"
   fi
   
-  # 3. 產生帶有智能判斷的分析摘要
-  local analysis_summary
-  if [ "$sockets" -gt 1 ] && [ "$physical_cores" -eq "$sockets" ]; then
-    # 【關鍵】在這裡，我們使用 printf 的 -v 選項來安全地將多行文本賦值給變數，避免 \n 問題的根源
-    printf -v analysis_summary "%s: %d %s, %d %s | %s: %s\n%s" \
-      "$t_result" "$sockets" "$t_socket" "$physical_cores" "$t_physical" \
-      "$t_ht" "$ht_status" "$t_warning"
-  else
-    analysis_summary="${t_result}: ${sockets} ${t_socket}, ${physical_cores} ${t_physical}, ${logical_cores} ${t_thread} | ${t_ht}: ${ht_status}"
+  # --- 第三步：生成分析摘要 ---
+  local analysis_summary="${t_result}: ${sockets} ${t_socket}, ${physical_cores} ${t_physical}, ${logical_cores} ${t_thread} | ${t_ht}: ${ht_status}"
+  local warning_line=""
+  
+  if (( sockets > 1 )); then
+    warning_line="$t_warning"
   fi
 
-  # 4. 將分析結果顯示在終端
+  # --- 第四步：終端顯示和報告寫入 ---
   echo -e "$analysis_summary"
+  if [ -n "$warning_line" ]; then
+    echo -e "${YELLOW}$warning_line${RESET}"
+  fi
 
-  # 5. 將所有內容附加到報告文件
   {
     echo "" 
     echo "$t_title"
     echo '```'
-    echo "$lscpu_output"
+    echo "$lscpu_human_output" # 報告中依然放人類友好的
     echo '```'
     echo ""
     echo -e "$analysis_summary"
+    if [ -n "$warning_line" ]; then
+        echo -e "\n**$warning_line**"
+    fi
   } >> "$report"
 }
+
 cpu_oversell_test() {
   local report="$HOME/result/hardware.txt"
   mkdir -p "$(dirname "$report")"
@@ -708,8 +721,9 @@ cpu_oversell_test() {
     local t_stress_params="[壓力參數: %d個並發線程]"
     local t_stress_conclusion_abnormal="壓力結論：性能反常。高壓下的延遲峰值反常地低於標準延遲，可能存在QoS限制或其他性能調度問題。"
     ;;
-  local esaccpu_idle=$(mpstat 1 1 | awk '/Average/ {print 100 - $12}')
-  if (( $(echo "$cpu_idle > 10" | bc -l) )); then
+  esac
+  local cpu_usage=$(mpstat 1 1 | awk '/Average/ {print 100 - $12}')
+  if [ -n "$cpu_usage" ] && (( $(echo "$cpu_usage > 10" | bc -l) )); then
     printf "${YELLOW}"
     printf "$t_warm" "$cpu_usage"
     printf "${RESET}\n"
