@@ -81,5 +81,5 @@ MatrixBench stands on the shoulders of giants. We extend our sincere credit to t
 
 *   **[yabs.sh](https://github.com/masonr/yet-another-bench-script):** For its robust Geekbench and disk performance testing engine.
 *   **[spiritLH/ecs](https://github.com/spiritLH/ecs):** Whose "fusion monster" approach inspired our system information display and sysbench logic.
-*   **[xykt](https://github.com/xykt):** For the powerful IP (`IP.Check.Place`) and network (`Net.Check.Place`) quality analysis scripts.
+*   **[xykt](https://github.com/xykt):** For the powerful IP (`IPQuality`) and network (`NetQuality`) quality analysis scripts.
 *   **[lmc999/RegionRestrictionCheck](https://github.com/lmc999/RegionRestrictionCheck):** For providing the core engine for our streaming unlock tests.
