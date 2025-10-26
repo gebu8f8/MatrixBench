@@ -8,7 +8,7 @@ The heart of `MatrixBench` lies in its unique **CPU Integrity Test**, which anal
 
 ## Key Highlights
 
-* **Exclusive CPU Integrity Test (Core Function):** In-depth analysis of `Steal Time` and core latency under stress, objectively evaluating the server's true stability.
+* **Exclusive CPU Integrity Test (Core Function):** Diagnoses server integrity by analyzing `Steal Time` and core latency under stress.
 * **Comprehensive Hardware Performance Assessment:** Comprehensive benchmarks covering CPU (SysBench & GeekBench 6), memory, and disk I/O.
 * **IP and Network Quality Report:** Generate a one-click graphical report analyzing IP quality, global network speed, latency, and backhaul routing.
 * **Streaming Unblocking Capability Test:** Quickly test a server's ability to unblock major streaming platforms. * **Automated graphic and text reports:** All complex test results will eventually generate images and structured text that are easy to share and save.
