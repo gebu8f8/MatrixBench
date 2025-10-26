@@ -1,5 +1,5 @@
 # MatrixBench (MB) — 伺服器「誠信度」檢測專家
-[简体中文](https://github.com/gebu8f8/MatrixBench/blob/main/README_cn.md)   [English](https://github.com/gebu8f8/MatrixBench/blob/main/README.md)
+[简体中文](https://github.com/gebu8f8/MatrixBench/blob/main/README_cn.md) | [English](https://github.com/gebu8f8/MatrixBench/blob/main/README.md)
 
 這不僅僅是又一個跑分腳本，它是一個**伺服器健康診斷儀**，旨在將模糊的「卡頓感」轉化為清晰、客觀的數據。
 
@@ -26,17 +26,17 @@ bash <(curl -sL https://mb.gebu8f.com)
 
 預設情況下，腳本會執行所有測試項目。你可以使用以下參數來運行特定的測試模組，節省時間。
 
-| 參數 (Parameter) | 說明 (Description)                               |
-| :--------------- | :----------------------------------------------- |
-| `-l <lang>`      | 設定腳本語言 (`cn` 為簡體中文, `us` 為英文 , 不選就是繁體中文)      |
-| `-hw`            | **硬體專項:** 運行所有硬體相關測試 (基礎信息, 跑分, CPU拓撲, CPU 誠信度) |
-| `-oversell`      | **核心診斷:** **僅運行**獨家的 CPU 誠信度與拓撲分析 |
-| `-ip`            | **IP 專項:** 僅運行 IP 質量檢測                   |
-| `-nq`            | **網路專項:** 僅運行網路質量 (回程路由) 檢測       |
-| `-stream`        | **流媒體專項:** 僅運行流媒體解鎖測試             |
-| `-speedtest`     | **測速專項:** 僅運行全球 Speedtest 測速          |
-| `-ping`          | **延遲專項:** 僅運行 Ping 延遲測試               |
-| `-stability`     | **穩定性專項:** 運行 aria2c 大流量下載穩定性測試  |
+| 參數 | 說明 |
+|:------ | :----|
+|`-l <lang>`| 設定腳本語言 (`cn` 為簡體中文, `us` 為英文 , 不選就是繁體中文)|
+|`-hw`| **硬體專項:** 運行所有硬體相關測試 (基礎信息, 跑分, CPU拓撲, CPU 誠信度)|
+|`-oversell` | **核心診斷:** **僅運行**獨家的 CPU 誠信度與拓撲分析|
+|`-ip`| **IP 專項:** 僅運行 IP 質量檢測|
+|`-nq`| **網路專項:** 僅運行網路質量 (回程路由) 檢測|
+|`-stream`| **流媒體專項:** 僅運行流媒體解鎖測試|
+|`-speedtest`| **測速專項:** 僅運行全球 Speedtest 測速|
+|`-ping`| **延遲專項:** 僅運行 Ping 延遲測試|
+|`-stability`| **穩定性專項:** 運行 aria2c 大流量下載穩定性測試|
 
 
 ### 使用範例
