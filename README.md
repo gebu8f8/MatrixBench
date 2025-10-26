@@ -13,7 +13,7 @@ The heart of `MatrixBench` lies in its unique **CPU Integrity Test**, which anal
 * **IP and Network Quality Report:** Generate a one-click graphical report analyzing IP quality, global network speed, latency, and backhaul routing.
 * **Streaming Unblocking Capability Test:** Quickly test a server's ability to unblock major streaming platforms. * **Automated graphic and text reports:** All complex test results will eventually generate images and structured text that are easy to share and save.
 
-* ## Quick Start
+## Quick Start
 
 Execute the following command to start a comprehensive health check. The script will automatically install the required dependencies.
 
