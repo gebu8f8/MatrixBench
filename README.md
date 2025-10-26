@@ -1,6 +1,6 @@
 # MatrixBench (MB) — Server "integrity" testing expert
 
-[繁體中文](https://github.com/gebu8f8/MatrixBench/blob/main/README_zh.md)  [简体中文](https://github.com/gebu8f8/MatrixBench/blob/main/README_cn.md)
+[繁體中文](https://github.com/gebu8f8/MatrixBench/blob/main/README_zh.md) | [简体中文](https://github.com/gebu8f8/MatrixBench/blob/main/README_cn.md)
 
 This isn't just another benchmark script; it's a **server health diagnostic tool** designed to transform vague "stuttering" into clear, objective data.
 
