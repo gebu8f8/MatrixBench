@@ -6,35 +6,36 @@ This isn't just another benchmark script; it's a **server health diagnostic tool
 
 The heart of `MatrixBench` lies in its unique **CPU Integrity Test**, which analyzes `Steal Time` and `Kernel Latency` to help you determine whether your VPS is performance-hacked or severely oversold.
 
-## Key Highlights
+## Key Features
 
-* **Exclusive CPU Integrity Test (Core Function):** Diagnoses server integrity by analyzing `Steal Time` and core latency under stress.
-* **Comprehensive Hardware Performance Assessment:** Comprehensive benchmarks covering CPU (SysBench & GeekBench 6), memory, and disk I/O.
-* **IP and Network Quality Report:** Generate a one-click graphical report analyzing IP quality, global network speed, latency, and backhaul routing.
-* **Streaming Unblocking Capability Test:** Quickly test a server's ability to unblock major streaming platforms. * **Automated graphic and text reports:** All complex test results will eventually generate images and structured text that are easy to share and save.
+*   **Diagnoses CPU Integrity:** Unveils true server stability by analyzing `Steal Time` and kernel latency, going beyond standard benchmarks.
+*   **Benchmarks Your Entire System:** Assesses CPU (SysBench & GeekBench 6), memory, and disk I/O performance.
+*   **Generates Sharable Reports:** Instantly creates beautiful, graphical reports for IP quality, network performance, and streaming unlock tests.
+*   **Tests Global Streaming Access:** Checks unblocking capabilities for major streaming platforms across different regions.
+*   **Reveals Network Quality:** Provides a complete picture of your network with global speed tests, latency checks, and backhaul routing analysis.
 
 ## Quick Start
 
-Execute the following command to start a comprehensive health check. The script will automatically install the required dependencies.
+Run the command below to perform a full system benchmark. Dependencies will be installed automatically.
 
 ```bash
-bash <(curl -sL https://mb.gebu8f.com) -l en
+bash <(curl -sL https://mb.g gebu8f.com) -l en
 ```
-> **Note:** When running for the first time or the server environment is very simple, the script will automatically install the necessary tools (such as `curl`, `jq`, `wkhtmltoimage`, etc.), which may take some time. **IPV6 only** requires at least ipv4
+> **Note:** The first run may take some time as the script installs necessary tools like `curl`, `jq`, and `wkhtmltoimage`. An IPv4 connection is required for all tests to run correctly.
 ## Options and parameters
-By default, the script executes all tests. You can use the following parameters to run specific test modules to save time.
+By default, MatrixBench performs a comprehensive analysis. Use the following options to run specific tests and save time.
 
-| Parameter | Description |
+| Option | Description |
 | :---: |:--- |
 |`-l <lang>`| Set the script language (`cn` for Simplified Chinese, `en` for English, leaving it unselected is Traditional Chinese) |
-|`-hw`| **Hardware-specific:** Run all hardware-related tests (basic information, benchmarks, CPU topology, CPU integrity) |
-|`-oversell`| **Core diagnostics:** **Only run** exclusive CPU integrity and topology analysis |
-|`-ip`| **IP-specific:** Run only IP quality testing |
-|`-nq`| **Network-specific:** Run only network quality (backhaul) testing |
-|`-stream`| **Streaming-specific:** Run only streaming unblocking tests |
-|`-speedtest`| **Speedtest-specific:** Run only global Speedtest speed tests |
-|`-ping`| **Latency-specific:** Run only the Ping latency test |
-|`-stability`| **Stability-specific:** Run the aria2c high-speed download stability test |
+|`-hw`| **Full Hardware Audit:** Runs all hardware tests, including benchmarks, CPU topology, and our exclusive **CPU Honesty Test**.|
+|`-oversell`| **CPU Honesty Test:** Our exclusive test to see if you're getting the CPU you paid for. |
+| `-ip`        | Performs an in-depth IP quality analysis.                   |
+| `-nq`        | Checks network quality and backhaul routing.                |
+| `-stream`    | Tests unblocking capabilities for major streaming services. |
+| `-speedtest` | Runs global network speed tests with Speedtest.net.         |
+| `-ping`      | Measures network latency with multiple Ping tests.          |
+| `-stability` | Assesses network stability with a high-traffic download test. |
 ### Usage Examples
 
 * **Just want a quick check to see if the CPU is oversold?**
