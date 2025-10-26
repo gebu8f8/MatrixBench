@@ -1,5 +1,5 @@
 # MatrixBench (MB) — 伺服器「诚信度」检测专家
-[繁體中文](https://github.com/gebu8f8/MatrixBench/blob/main/README_zh.md)  [English](https://github.com/gebu8f8/MatrixBench/blob/main/README.md)
+[繁體中文](https://github.com/gebu8f8/MatrixBench/blob/main/README_zh.md) | [English](https://github.com/gebu8f8/MatrixBench/blob/main/README.md)
 
 这不仅仅是又一个跑分脚本，它是一个**伺服器健康诊断仪**，旨在将模糊的「卡顿感」转化为清晰、客观的数据。
 
