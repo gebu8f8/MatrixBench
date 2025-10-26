@@ -77,7 +77,7 @@ lang(){
     streaming_unlock_2="流媒体解锁测试报告"
     regional_speedtest_1="警告：无法取得 IP 地理资讯，将跳过区域测速。"
     regional_speedtest_2="资讯：未找到明确的洲别对应，将跳过区域测速。"
-    speedtest_global_1="正在执行全球网路测速，这可能需要 15-30 分钟，请耐心等待..."
+    speedtest_global_1="正在执行全球网络测速，这可能需要 15-30 分钟，请耐心等待..."
     speedtest_global_2="警告：侦测到速率限制，将跳过区域测速。"
   elif [ "$lang" == "us" ]; then
     check_system_1="CentOS 7 or CentOS 8 are not supported. Please upgrade to 9 series (Rocky/Alma/CentOS Stream)"
@@ -1224,8 +1224,8 @@ regional_speedtest() {
   # 根據語言設定文字
   case "$lang" in
     cn)
-      local t_running="正在执行区域网路测速 (区域: ${region})，这可能需要 5-20 分钟..."
-      local t_report="## ${region^^}区域网路速度测试报告 (前10名与后3名)"
+      local t_running="正在执行区域网络测速 (区域: ${region})，这可能需要 5-20 分钟..."
+      local t_report="## ${region^^}区域网络速度测试报告 (前10名与后3名)"
       ;;
     us)
       local t_running="Running regional network speed test (region: ${region}), this may take 5-20 minutes..."
@@ -1257,8 +1257,8 @@ speedtest_global() {
   # 根據語言設定文字
   case "$lang" in
     cn)
-      local t_running="正在执行全球网路测速，这可能需要 15-30 分钟，请耐心等待..."
-      local t_report="## 全球网路速度测试报告 (前10名与后3名)"
+      local t_running="正在执行全球网络测速，这可能需要 15-30 分钟，请耐心等待..."
+      local t_report="## 全球网络速度测试报告 (前10名与后3名)"
       local t_warning="警告：侦测到速率限制，将跳过区域测速。"
       ;;
     us)
@@ -1375,11 +1375,11 @@ aria2_test(){
   # 根據語言設定文字
   case "$lang" in
     cn)
-      local t_prompt="加码测试：这是一个 aria2c 下载 Ubuntu 大档案五次，每次休息三十秒的网路稳定性测试。五次消耗流量大约是29GB。为了避免耗尽您的流量还有被服务商停驶您的伺服器，是否继续？(Y/n) [预设是：N] "
+      local t_prompt="加码测试：这是一个 aria2c 下载 Ubuntu 大档案五次，每次休息三十秒的网络稳定性测试。五次消耗流量大约是29GB。为了避免耗尽您的流量还有被服务商停驶您的伺服器，是否继续？(Y/n) [预设是：N] "
       local t_cancelled="测试已取消。"
-      local t_start="网路稳定性加码测试开始，这将需要几分钟时间..."
-      local t_title="## 网路稳定性测试"
-      local t_complete="网路稳定性测试完成"
+      local t_start="网络稳定性加码测试开始，这将需要几分钟时间..."
+      local t_title="## 网络稳定性测试"
+      local t_complete="网络稳定性测试完成"
       ;;
     us)
       local t_prompt="Bonus test: This is an aria2c download test of Ubuntu large files five times, with a 30-second break between each download for network stability testing. Five downloads consume approximately 29GB of traffic. To avoid exhausting your traffic and having your server suspended by the service provider, do you want to continue? (Y/n) [Default: N] "
@@ -1436,12 +1436,12 @@ all_report() {
     cn)
       local t_basic="## 基础信息"
       local t_ip_quality="## IP质量"
-      local t_net_quality="## 网路质量"
+      local t_net_quality="## 网络质量"
       local t_streaming="## 流媒体"
       local t_stability="## 稳定性测试"
       local t_img1="第一个基础信息图片对应到："
       local t_img2="第二个IP质量图片对应到："
-      local t_img3="第三个网路质量图片对应到："
+      local t_img3="第三个网络质量图片对应到："
       local t_img4="第四个路由追踪图片对应到："
       local t_img5="第五个流媒体图片对应到："
       local t_img4_alt="第四个流媒体图片对应到："
