@@ -83,3 +83,4 @@ MatrixBench stands on the shoulders of giants. We extend our sincere credit to t
 *   **[oneclickvirt/ecs](https://github.com/oneclickvirt/ecs):** Whose "ECS" approach inspired our system information display and sysbench logic.
 *   **[xykt](https://github.com/xykt):** For the powerful IP (`IPQuality`) and network (`NetQuality`) quality analysis scripts.
 *   **[lmc999/RegionRestrictionCheck](https://github.com/lmc999/RegionRestrictionCheck):** For providing the core engine for our streaming unlock tests.
+*   **[nws.sh](https://github.com/su-haris/simple-network-speedtest):** For providing the core engine for our global and regional speed tests.
