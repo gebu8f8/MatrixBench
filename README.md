@@ -79,8 +79,8 @@ https://www.gebu8f.com/matrixbench/
 
 MatrixBench stands on the shoulders of giants. We extend our sincere credit to the following projects and authors for their foundational work:
 
-*   **[yabs.sh](https://github.com/masonr/yet-another-bench-script):** For its robust Geekbench and disk performance testing engine.
-*   **[oneclickvirt/ecs](https://github.com/oneclickvirt/ecs):** Whose "ECS" approach inspired our system information display and sysbench logic.
+*   **[yabs.sh](https://github.com/masonr/yet-another-bench-script):** For its robust Geekbench performance testing engine.
+*   **[oneclickvirt/ecs](https://github.com/oneclickvirt/ecs):** Whose "ECS" approach inspired our system information display, sysbench and disk logic.
 *   **[xykt](https://github.com/xykt):** For the powerful IP (`IPQuality`) and network (`NetQuality`) quality analysis scripts.
 *   **[lmc999/RegionRestrictionCheck](https://github.com/lmc999/RegionRestrictionCheck):** For providing the core engine for our streaming unlock tests.
 *   **[nws.sh](https://github.com/su-haris/simple-network-speedtest):** For providing the core engine for our global and regional speed tests.
