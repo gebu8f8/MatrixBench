@@ -79,7 +79,7 @@ https://www.gebu8f.com/matrixbench/
 本專案的順利開發，離不開以下優秀的開源專案和作者，在此表示誠摯的感謝。`MatrixBench` 是在他們的基礎之上，專注於提供更深層次的診斷分析。
 
 *   **[yabs.sh](https://github.com/masonr/yet-another-bench-script):** 提供了業界標準的 Geekbench 性能測試引擎。
-*   **[oneclickvirt/ecs](https://github.com/oneclickvirt/ecs):** 俗稱「融合怪」，我們的系統信息展示、sysbench、硬碟 邏輯功能深受其啟發。
+*   **[oneclickvirt/ecs](https://github.com/oneclickvirt/ecs):** 俗稱「融合怪」，我們的系統信息展示、sysbench、硬碟測試 邏輯功能深受其啟發。
 *   **[xykt](https://github.com/xykt):** 創作的 `IPQuality` 與 `NetQuality` 腳本，為本專案的 IP 和網路質量分析提供了強大的核心支持。
 * **[lmc999/RegionRestrictionCheck](https://github.com/lmc999/RegionRestrictionCheck):** 為我們的流媒體檢測提供了強大的核心支持。
 *   **[nws.sh](https://github.com/su-haris/simple-network-speedtest):** 為我們的全球及區域速度測試，提供了核心支持。
