@@ -80,3 +80,4 @@ https://www.gebu8f.com/matrixbench/
 *   **[oneclickvirt/ecs](https://github.com/oneclickvirt/ecs):** 俗称「融合怪」，我们的系统信息展示、sysbench 逻辑功能深受其启发。
 *   **[xykt](https://github.com/xykt):** 创作的 `IPQuality` 与 `NetQuality` 脚本，为本专案的 IP 和网络质量以及路由追踪分析提供了强大的核心支持。
 *   **[lmc999/RegionRestrictionCheck](https://github.com/lmc999/RegionRestrictionCheck):** 为我们的流媒体检测提供了强大的核心支持。
+*   **[nws.sh](https://github.com/su-haris/simple-network-speedtest):** 为我们的全球及区域速度测试，提供了核心支持。
