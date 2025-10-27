@@ -19,7 +19,7 @@ The heart of `MatrixBench` lies in its unique **CPU Integrity Test**, which anal
 Run the command below to perform a full system benchmark. Dependencies will be installed automatically.
 
 ```bash
-bash <(curl -sL https://mb.g gebu8f.com) -l en
+bash <(curl -sL https://mb.gebu8f.com) -l en
 ```
 > **Note:** The first run may take some time as the script installs necessary tools like `curl`, `jq`, and `wkhtmltoimage`. An IPv4 connection is required for all tests to run correctly.
 ## Options and parameters
