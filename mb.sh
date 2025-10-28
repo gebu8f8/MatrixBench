@@ -33,7 +33,7 @@ YELLOW='\033[1;33m'  # ⚠️ 警告用黃色
 CYAN="\033[1;36m"    # ℹ️ 一般提示用青色
 RESET='\033[0m'      # 清除顏色
 
-version="v2025.10.26"
+version="v2025.10.28"
 
 lang(){
   # 語言設定函式 - 目前使用命令行參數控制
@@ -219,21 +219,26 @@ check_app(){
   
   # --- Emoji 字體安裝 ---
   if ! fc-list | grep -qi "NotoColorEmoji"; then
-    echo -e "${CYAN}Installing Noto Color Emoji font...${RESET}"
     case $system in
       1) apt install -y fonts-noto-color-emoji ;;
       2)
-        yum install -y epel-release
         yum install -y google-noto-emoji-color-fonts
         ;;
     esac
   fi
-  if ! fc-list | grep -qi "wqy-zenhei"; then
-    case $system in
-      1) apt-get install -y fonts-wqy-zenhei ;;
-      2) yum install -y wqy-zenhei-fonts ;; # 在 CentOS/RHEL 上的包名不同
-      3) apk add --no-cache font-wqy-zenhei ;;
-    esac
+  if [ $lang != us ]; then
+    if ! fc-list | grep -qi "Noto Sans CJK"; then
+      case $system in
+      1)
+        apt update -y
+        apt install -y fonts-noto-cjk fonts-noto-mono
+        ;;
+      2)
+        yum install -y google-noto-sans-cjk-ttc-fonts google-noto-sans-mono-fonts || yum install -y google-noto-cjk-fonts google-noto-sans-fonts
+        ;;
+      esac
+      fc-cache -fv >/dev/null 2>&1
+    fi
   fi
   if ! command -v wkhtmltoimage >/dev/null 2>&1; then
     case $system in
@@ -382,7 +387,7 @@ ecs_simple_static() (
   
   aha --title "$t_title" --stylesheet <<< "$extracted_block" > "$TEMP_HTML"
   sed -i '/<\/style>/i \
-    body { background-color: #0c0c0c; color: #cccccc; font-family: "Noto Color Emoji", "Segoe UI Emoji", "Apple Color Emoji", "Courier New", monospace; padding: 20px; } \
+    body { background-color: #0c0c0c; color: #cccccc; font-family: "Noto Sans CJK SC", "Noto Sans CJK TC", "Noto Sans", "Noto Sans Mono", "Noto Color Emoji", "Segoe UI Emoji", "Apple Color Emoji", "Courier New", monospace; padding: 20px; } \
     pre { white-space: pre-wrap; word-wrap: break-word; }' "$TEMP_HTML"
   wkhtmltoimage \
     --width 800 \
@@ -477,42 +482,42 @@ hardware_benchmarks() (
   # 根據語言設定文字
   case "$lang" in
     cn)
-      local t_cpu_sys="## CPU测试（sysbench）"
+      local t_cpu_sys="CPU测试（sysbench）"
       local t_single="单核"
       local t_multi="多核"
-      local t_cpu_gb6="## CPU测试（GeekBench 6）"
-      local t_memory="## 内存测试"
+      local t_cpu_gb6="CPU测试（GeekBench 6）"
+      local t_memory="内存测试"
       local t_read="读取"
       local t_write="写入"
-      local t_disk="## 硬盘"
+      local t_disk="硬盘"
       local t_combined="总合"
       ;;
     us)
       local t_cpu_sys="CPU Test (sysbench)"
       local t_single="Single Core"
       local t_multi="Multi Core"
-      local t_cpu_gb6="## CPU Test (GeekBench 6)"
-      local t_memory="## Memory Test"
+      local t_cpu_gb6="CPU Test (GeekBench 6)"
+      local t_memory="Memory Test"
       local t_read="Read"
       local t_write="Write"
-      local t_disk="## Disk"
+      local t_disk="Disk"
       local t_combined="Total"
       ;;
     *)
-      local t_cpu_sys="## CPU測試（sysbench）"
+      local t_cpu_sys="CPU測試（sysbench）"
       local t_single="單核"
       local t_multi="多核"
-      local t_cpu_gb6="## CPU測試（GeekBench 6）"
-      local t_memory="## 記憶體測試"
+      local t_cpu_gb6="CPU測試（GeekBench 6）"
+      local t_memory="記憶體測試"
       local t_read="讀取"
       local t_write="寫入"
-      local t_disk="## 硬碟"
+      local t_disk="硬碟"
       local t_combined="總合"
       ;;
   esac
 
   {
-    echo "$t_cpu_sys"
+    echo "## $t_cpu_sys"
     if [ "$cpu_count" -eq 1 ]; then
       echo "${t_single}：${sys_single_score:-N/A}"
     else
@@ -520,15 +525,15 @@ hardware_benchmarks() (
       echo "${t_multi}：${sys_multi_score:-N/A}"
     fi
     echo ""
-    echo "$t_cpu_gb6"
+    echo "## $t_cpu_gb6"
     echo "${t_single}：${gb6_single_score:-N/A}"
     echo "${t_multi}：${gb6_multi_score:-N/A}"
     echo ""
-    echo "$t_memory"
+    echo "## $t_memory"
     echo "${t_read}：${mem_read_speed:-N/A}"
     echo "${t_write}：${mem_write_speed:-N/A}"
     echo ""
-    echo "$t_disk"
+    echo "## $t_disk"
     echo "| | 4k | 64k | 512k | 1m |"
     echo "|:---|:---|:---|:---|:---|"
     echo "| $t_read | ${disk_r_4k:-N/A} | ${disk_r_64k:-N/A} | ${disk_r_512k:-N/A} | ${disk_r_1m:-N/A} |"
@@ -895,26 +900,52 @@ ip_quality() {
   aha --title "$ip_quality_2" < "$OFFICIAL_ANSI_OUTPUT" > "$TEMP_HTML"
   
   sed -i '/<head>/a \
-    <style type="text/css"> \
-      body { background-color: #1e1e1e !important; font-family: "Noto Color Emoji", "DejaVu Sans Mono", "Courier New", monospace; padding: 25px; } \
-      pre { color: #d8d8d8; white-space: pre-wrap; word-wrap: break-word; font-size: 14px; line-height: 1.4; } \
-      \
-      /* 覆寫內聯樣式 - 提高對比度配色 */ \
-      span[style*="color:red"] { color: #f07178 !important; } \
-      span[style*="color:green"] { color: #a6e22e !important; } \
-      span[style*="color:teal"] { color: #66d9ef !important; } \
-      span[style*="color:olive"] { color: #d4a72c !important; } \
-      span[style*="color:dimgray"] { color: #75715e !important; } \
-      span[style*="color:gray"] { color: #c0c0c0 !important; } \
-      \
-      /* 背景色調整 - 更高對比度 */ \
-      span[style*="background-color:red"] { background-color: #d73a49 !important; } \
-      span[style*="background-color:green"] { background-color: #28a745 !important; } \
-      span[style*="background-color:olive"] { background-color: #9a7b2e !important; } \
-    <\/style>' "$TEMP_HTML"
+  <style type="text/css"> \
+    body { \
+      background-color: #181a1f !important; \
+      font-family: "Noto Sans CJK SC", "Noto Sans CJK TC", "Noto Sans", "Noto Sans Mono", "Noto Color Emoji", "DejaVu Sans Mono", "Courier New", monospace; \
+      padding: 25px; \
+      color: #cfcfcf; \
+    } \
+    pre { \
+      color: #cfcfcf; \
+      white-space: pre-wrap; \
+      word-wrap: break-word; \
+      font-size: 14px; \
+      line-height: 1.45; \
+      letter-spacing: 0.2px; \
+    } \
+    \
+    span[style*="color:red"] { color: #ff5555 !important; text-shadow: none !important; } \
+    span[style*="color:green"] { color: #586e44 !important; text-shadow: none !important; } \
+    span[style*="color:green"][style*="font-weight:bold"] { color: #93d367 !important; text-shadow: 0 0 3px #003d00 !important; } \
+    span[style*="color:yellow"] { color: #f1fa8c !important; text-shadow: 0 0 3px #7a751e; } \
+    span[style*="color:blue"] { color: #61afef !important; text-shadow: 0 0 3px #234a7a; } \
+    span[style*="color:cyan"] { color: #8be9fd !important; text-shadow: 0 0 3px #236b7a; } \
+    span[style*="color:magenta"], span[style*="color:purple"] { color: #bd93f9 !important; text-shadow: 0 0 3px #4a2a7a; } \
+    span[style*="color:gray"], span[style*="color:dimgray"] { color: #9e9e9e !important; } \
+    span[style*="color:white"] { color: #e6e6e6 !important; } \
+    span[style*="color:olive"]{ color: #f1fa8c !important; } \
+    span[style*="color:teal"] { color: #3d5557 !important; } \
+    \
+    span[style*="background-color:red"] { background-color: #bc0013 !important; color: #fff !important; } \
+    span[style*="background-color:green"] { background-color: #45a815 !important; color: #ffffff !important; } \
+    span[style*="background-color:blue"] { background-color: #003366 !important; color: #fff !important; } \
+    span[style*="background-color:cyan"] { background-color: #004b4b !important; color: #fff !important; } \
+    span[style*="background-color:yellow"] { background-color: #7a6e00 !important; color: #fff !important; } \
+    span[style*="background-color:purple"], span[style*="background-color:magenta"] { background-color: #4b006e !important; color: #fff !important; } \
+    span[style*="background-color:olive"] { background-color: #e8751d !important; color: #ffffff !important; } \
+    span[style*="background-color:green"][style*="font-weight:bold"] { color: #ffffff !important; } \
+    \
+    span[style*="text-decoration:underline"] { \
+      text-decoration-thickness: 2px !important; \
+      text-underline-offset: 2px !important; \
+      text-decoration-color: currentColor !important; \
+    } \
+  <\/style>' "$TEMP_HTML"
 
   wkhtmltoimage \
-    --width 1200 \
+    --width 700 \
     --quality 100 \
     --encoding utf-8 \
     "$TEMP_HTML" \
@@ -944,42 +975,50 @@ net_quality() {
   aha --title "$net_quality_2" < "$OFFICIAL_ANSI_OUTPUT" > "$TEMP_HTML"
   
   sed -i '/<head>/a \
-    <style type="text/css"> \
-      body { background-color: #1e1e1e !important; font-family: "Noto Color Emoji", "DejaVu Sans Mono", "Courier New", monospace; padding: 25px; } \
-      pre { color: #d8d8d8; white-space: pre-wrap; word-wrap: break-word; font-size: 14px; line-height: 1.4; } \
-      \
-      /* 覆寫內聯樣式 - 提高對比度配色 */ \
-      span[style*="color:red"] { color: #f07178 !important; } \
-      span[style*="color:green"] { color: #a6e22e !important; } \
-      span[style*="color:blue"] { color: #61afef !important; } \
-      span[style*="color:cyan"] { color: #66d9ef !important; } \
-      span[style*="color:teal"] { color: #66d9ef !important; } \
-      span[style*="color:yellow"] { color: #e6db74 !important; } \
-      span[style*="color:olive"] { color: #e6db74 !important; } \
-      span[style*="color:purple"] { color: #c678dd !important; } \
-      span[style*="color:magenta"] { color: #c678dd !important; } \
-      span[style*="color:dimgray"] { color: #75715e !important; } \
-      span[style*="color:gray"] { color: #c0c0c0 !important; } \
-      span[style*="color:white"] { color: #d8d8d8 !important; } \
-      \
-      /* 背景色調整 - 更高對比度 */ \
-      span[style*="background-color:red"] { background-color: #d73a49 !important; } \
-      span[style*="background-color:green"] { background-color: #28a745 !important; } \
-      span[style*="background-color:blue"] { background-color: #3a5a7a !important; } \
-      span[style*="background-color:cyan"] { background-color: #3a5a6a !important; } \
-      span[style*="background-color:olive"] { background-color: #b58900 !important; } \
-      span[style*="background-color:yellow"] { background-color: #b58900 !important; } \
-      \
-      /* 加強底線效果 */ \
-      span[style*="text-decoration:underline"] { \
-        text-decoration-thickness: 2px !important; \
-        text-decoration-color: currentColor !important; \
-        text-underline-offset: 2px !important; \
-      } \
-    <\/style>' "$TEMP_HTML"
+  <style type="text/css"> \
+    body { \
+      background-color: #181a1f !important; \
+      font-family: "Noto Sans CJK SC", "Noto Sans CJK TC", "Noto Sans", "Noto Sans Mono", "Noto Color Emoji", "DejaVu Sans Mono", "Courier New", monospace; \
+      padding: 25px; \
+      color: #cfcfcf; \
+    } \
+    pre { \
+      color: #cfcfcf; \
+      white-space: pre-wrap; \
+      word-wrap: break-word; \
+      font-size: 14px; \
+      line-height: 1.45; \
+      letter-spacing: 0.2px; \
+    } \
+    \
+    span[style*="color:red"] { color: #ff5555 !important; text-shadow: 0 0 3px #7f2222; } \
+    span[style*="color:green"] { color: #586e44 !important; text-shadow: 0 0 3px #003d00; } \
+    span[style*="color:yellow"] { color: #f1fa8c !important; text-shadow: 0 0 3px #7a751e; } \
+    span[style*="color:blue"] { color: #61afef !important; text-shadow: 0 0 3px #234a7a; } \
+    span[style*="color:cyan"] { color: #8be9fd !important; text-shadow: 0 0 3px #236b7a; } \
+    span[style*="color:magenta"], span[style*="color:purple"] { color: #bd93f9 !important; text-shadow: 0 0 3px #4a2a7a; } \
+    span[style*="color:gray"], span[style*="color:dimgray"] { color: #9e9e9e !important; } \
+    span[style*="color:white"] { color: #e6e6e6 !important; } \
+    span[style*="color:olive"]{ color: #f1fa8c !important; } \
+    span[style*="color:teal"] { color: #3d5857 !important; } \
+    \
+    span[style*="background-color:red"] { background-color: #8b0000 !important; color: #fff !important; } \
+    span[style*="background-color:green"] { background-color: #586e44 !important; color: #fff !important; } \
+    span[style*="background-color:blue"] { background-color: #003366 !important; color: #fff !important; } \
+    span[style*="background-color:cyan"] { background-color: #004b4b !important; color: #fff !important; } \
+    span[style*="background-color:yellow"] { background-color: #7a6e00 !important; color: #fff !important; } \
+    span[style*="background-color:purple"], span[style*="background-color:magenta"] { background-color: #4b006e !important; color: #fff !important; } \
+    span[style*="background-color:olive"] { background-color: #e8751d !important; color: #ffffff !important; } \
+    \
+    span[style*="text-decoration:underline"] { \
+      text-decoration-thickness: 2px !important; \
+      text-underline-offset: 2px !important; \
+      text-decoration-color: currentColor !important; \
+    } \
+  <\/style>' "$TEMP_HTML"
 
   wkhtmltoimage \
-    --width 1200 \
+    --width 800 \
     --quality 100 \
     --encoding utf-8 \
     "$TEMP_HTML" \
@@ -1006,36 +1045,54 @@ net_rounting() {
   aha --title "路由追踪报告" < "$OFFICIAL_ANSI_OUTPUT" > "$TEMP_HTML"
   
   sed -i '/<head>/a \
-    <style type="text/css"> \
-      body { background-color: #1e1e1e !important; font-family: "Noto Color Emoji", "DejaVu Sans Mono", "Courier New", monospace; padding: 25px; } \
-      pre { color: #d8d8d8; white-space: pre-wrap; word-wrap: break-word; font-size: 14px; line-height: 1.4; } \
-      \
-      /* 覆寫內聯樣式 - 柔和配色（完整版） */ \
-      span[style*="color:red"] { color: #e06c75 !important; } \
-      span[style*="color:green"] { color: #98c379 !important; } \
-      span[style*="color:blue"] { color: #61afef !important; } \
-      span[style*="color:cyan"] { color: #56b6c2 !important; } \
-      span[style*="color:teal"] { color: #56b6c2 !important; } \
-      span[style*="color:yellow"] { color: #e5c07b !important; } \
-      span[style*="color:olive"] { color: #d19a66 !important; } \
-      span[style*="color:purple"] { color: #c678dd !important; } \
-      span[style*="color:magenta"] { color: #c678dd !important; } \
-      span[style*="color:dimgray"] { color: #5c6370 !important; } \
-      span[style*="color:gray"] { color: #abb2bf !important; } \
-      span[style*="color:white"] { color: #d8d8d8 !important; } \
-      \
-      /* 背景色調整 */ \
-      span[style*="background-color:red"] { background-color: #be5046 !important; } \
-      span[style*="background-color:green"] { background-color: #5a8a4a !important; } \
-      span[style*="background-color:blue"] { background-color: #3a5a7a !important; } \
-      span[style*="background-color:cyan"] { background-color: #3a5a6a !important; } \
-      span[style*="background-color:olive"] { background-color: #8a7a3a !important; } \
-      span[style*="background-color:yellow"] { background-color: #8a7a3a !important; } \
-    <\/style>' "$TEMP_HTML"
+  <style type="text/css"> \
+    body { \
+      background-color: #181a1f !important; \
+      font-family: "Noto Sans CJK SC", "Noto Sans CJK TC", "Noto Sans", "Noto Sans Mono", "Noto Color Emoji", "DejaVu Sans Mono", "Courier New", monospace; \
+      padding: 25px; \
+      color: #cfcfcf; \
+    } \
+    pre { \
+      color: #cfcfcf; \
+      white-space: pre-wrap; \
+      word-wrap: break-word; \
+      font-size: 14px; \
+      line-height: 1.45; \
+      letter-spacing: 0.2px; \
+    } \
+    \
+    span[style*="color:red"] { color: #ff5555 !important; text-shadow: 0 0 3px #7f2222; } \
+    span[style*="color:green"] { color: #586e44 !important; text-shadow: 0 0 3px #003d00; } \
+    span[style*="color:yellow"] { color: #f1fa8c !important; text-shadow: 0 0 3px #7a751e; } \
+    span[style*="color:blue"] { color: #61afef !important; text-shadow: 0 0 3px #234a7a; } \
+    span[style*="color:cyan"] { color: #8be9fd !important; text-shadow: 0 0 3px #236b7a; } \
+    span[style*="color:magenta"], span[style*="color:purple"] { color: #bd93f9 !important; text-shadow: 0 0 3px #4a2a7a; } \
+    span[style*="color:gray"], span[style*="color:dimgray"] { color: #9e9e9e !important; } \
+    span[style*="color:white"] { color: #e6e6e6 !important; } \
+    span[style*="color:olive"]{ color: #f1fa8c !important; text-shadow: 0 0 3px #7a751e; } \
+    span[style*="color:teal"] { color: #3d5857 !important; text-shadow: 0 0 3px #1a2c2b; } \
+    \
+    span[style*="background-color:red"] { background-color: #8b0000 !important; color: #fff !important; } \
+    span[style*="background-color:green"] { background-color: #586e44 !important; color: #fff !important; } \
+    span[style*="background-color:blue"] { background-color: #003366 !important; color: #fff !important; } \
+    span[style*="background-color:cyan"] { background-color: #004b4b !important; color: #fff !important; } \
+    span[style*="background-color:yellow"] { background-color: #7a6e00 !important; color: #fff !important; } \
+    span[style*="background-color:purple"], span[style*="background-color:magenta"] { background-color: #4b006e !important; color: #fff !important; } \
+    \
+    span[style*="background-color:gray"], span[style*="background-color:dimgray"] { background-color: #5c6370 !important; color: #ffffff !important; } \
+    span[style*="background-color:teal"] { background-color: #004b4b !important; color: #ffffff !important; } \
+    span[style*="background-color:olive"] { background-color: #e8751d !important; color: #ffffff !important; } \
+    \
+    span[style*="text-decoration:underline"] { \
+      text-decoration-thickness: 2px !important; \
+      text-underline-offset: 2px !important; \
+      text-decoration-color: currentColor !important; \
+    } \
+  <\/style>' "$TEMP_HTML"
 
 
   wkhtmltoimage \
-    --width 1200 \
+    --width 1000 \
     --quality 100 \
     --encoding utf-8 \
     "$TEMP_HTML" \
@@ -1095,7 +1152,7 @@ streaming_unlock() {
     <\/style>' "$TEMP_HTML"
     
   wkhtmltoimage \
-    --width 800 \
+    --width 700 \
     --quality 100 \
     --encoding utf-8 \
     "$TEMP_HTML" \
@@ -1312,8 +1369,8 @@ ping_test(){
       local t_packet_loss="丢包率"
       ;;
     us)
-      local t_start="Latency test started"
-      local t_title="## Latency Test"
+      local t_start="Starting latency tests..." # <--- Style Fix
+      local t_title="## Latency Test"         # <--- Style Fix: Singular is better
       local t_region="Region"
       local t_avg_latency="Average Latency"
       local t_packet_loss="Packet Loss"
@@ -1327,7 +1384,7 @@ ping_test(){
       ;;
   esac
 
-  echo "$t_start"
+  echo -e "${CYAN}${t_start}${RESET}" # <--- Style Fix: Added color
 
   case $lang in
   us)
@@ -1346,11 +1403,15 @@ ping_test(){
     echo "| $t_region | $t_avg_latency | $t_packet_loss |"
     echo "|:---|:---|:---|"
 
-    # 跳過表頭行，從測試結果開始解析
-    echo "$ping_output" | sed -n '/^------------------------------------------------------------$/,$p' | tail -n +2 | \
+    # --- [核心修正] ---
+    # 使用更穩健的正規表示式來匹配分隔線
+    # /^---/ 匹配任何以至少三個連字號開頭的行
+    echo "$ping_output" | sed -n '/^---/,$p' | tail -n +2 | \
       while IFS= read -r line; do
-        # 處理空行
+        # 處理空行或非數據行
         [ -z "$line" ] && continue
+        # 增加一個檢查，確保行內有 IP 地址，過濾掉可能的頁尾文字
+        ! [[ "$line" =~ [0-9]+\.[0-9]+\.[0-9]+\.[0-9]+ ]] && continue
 
         # 從行尾提取丟包率 (最後一個欄位)
         loss=$(echo "$line" | awk '{print $NF}')
@@ -1358,9 +1419,9 @@ ping_test(){
         # 提取延遲時間 (倒數第三和第二個欄位，例如 "123.456 ms")
         avg=$(echo "$line" | awk '{print $(NF-2), $(NF-1)}')
 
-        # 提取地區名稱 (從頭開始到 IP 位址之前的所有部分)
-        # 邏輯：移除最後 4 個欄位 (IP, avg, ms, loss)
-        region=$(echo "$line" | awk '{$NF=""; $(NF-1)=""; $(NF-2)=""; $(NF-3)=""; print $0}' | sed 's/[[:space:]]*$//')
+        # [優化] 使用更穩健的方式提取地區名稱
+        # 打印除了最後四個字段（IP, avg, ms, loss）之外的所有內容
+        region=$(echo "$line" | awk '{ for(i=1; i<=NF-4; i++) printf "%s ", $i; printf "\n" }' | sed 's/[[:space:]]*$//')
 
         echo "| $region | $avg | $loss |"
       done
@@ -1546,7 +1607,7 @@ do_oversell=false
 if [[ "$1" == "--install" ]]; then
   echo "Setting up 'mb' command..."
   # 創建上面那個迷你啟動器的內容
-  LAUNCHER_CONTENT='#!/bin/bash\nSOURCE_URL="https://gitlab.com/gebu8f/sh/-/raw/main/testing_server/test.sh"\nexec bash <(curl -sL "$SOURCE_URL") "$@"'
+  LAUNCHER_CONTENT='#!/bin/bash\nSOURCE_URL="https://gitlab.com/gebu8f/sh/-/raw/main/testing_server/mb.sh"\nexec bash <(curl -sL "$SOURCE_URL") "$@"'
   
   echo -e "$LAUNCHER_CONTENT" | sudo tee /usr/local/bin/mb > /dev/null
   chmod +x /usr/local/bin/mb
@@ -1637,6 +1698,11 @@ if $run_all; then
   aria2_test
   all_report
 else
+  if $do_hw && $do_oversell; then
+    [ $lang == us ] && echo -e "${RED}Error: The execution contents of two variables are duplicated, please select only one -hw or -oversell${RESET}"
+    [ $lang != us ] && echo -e "${RED}錯誤：兩個變量執行內容是重複的，請只選擇一個-hw或是-oversell${RESET}"
+    exit 1
+  fi
   if $do_hw; then
     ecs_download
     ecs_simple_static
@@ -1677,7 +1743,7 @@ else
   if $do_stability; then
     aria2_test
   fi
-  echo "所有數據都在$HOME/result資料夾"
-  echo "All data is in the $HOME/result folder"
+  [ $lang != us ] && echo "所有數據都在$HOME/result資料夾"
+  [ $lang == us ] && echo "All data is in the $HOME/result folder"
 fi
   
