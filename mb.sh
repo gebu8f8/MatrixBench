@@ -896,6 +896,8 @@ ip_quality() {
   
   bash <(curl -Ls https://IP.Check.Place) $ipcecek -y -p -o $OFFICIAL_ANSI_OUTPUT >/dev/null 2>&1
   cat $OFFICIAL_ANSI_OUTPUT
+  
+  sed -i 's/\r//g; /^$/d' "$OFFICIAL_ANSI_OUTPUT"
 
   aha --title "$ip_quality_2" < "$OFFICIAL_ANSI_OUTPUT" > "$TEMP_HTML"
   
@@ -971,6 +973,8 @@ net_quality() {
 
   bash <(curl -Ls https://Net.Check.Place) $netcecek -p -y -o $OFFICIAL_ANSI_OUTPUT >/dev/null 2>&1
   cat $OFFICIAL_ANSI_OUTPUT
+  
+  sed -i 's/\r//g; /^$/d' "$OFFICIAL_ANSI_OUTPUT"
 
   aha --title "$net_quality_2" < "$OFFICIAL_ANSI_OUTPUT" > "$TEMP_HTML"
   
@@ -1041,6 +1045,8 @@ net_rounting() {
   
   bash <(curl -Ls https://Net.Check.Place) -R -p -y -o $OFFICIAL_ANSI_OUTPUT >/dev/null 2>&1
   cat $OFFICIAL_ANSI_OUTPUT
+  
+  sed -i 's/\r//g; /^$/d' "$OFFICIAL_ANSI_OUTPUT"
 
   aha --title "路由追踪报告" < "$OFFICIAL_ANSI_OUTPUT" > "$TEMP_HTML"
   
