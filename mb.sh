@@ -33,7 +33,7 @@ YELLOW='\033[1;33m'  # ⚠️ 警告用黃色
 CYAN="\033[1;36m"    # ℹ️ 一般提示用青色
 RESET='\033[0m'      # 清除顏色
 
-version="v2025.10.28"
+version="v2025.10.29"
 
 lang(){
   # 語言設定函式 - 目前使用命令行參數控制
@@ -281,8 +281,6 @@ ecs_download() {
   if [ -f $TEMP_WORKDIR/goces ]; then
     return
   fi
-  local LATEST_TAG
-  LATEST_TAG=$(curl -s "https://api.github.com/repos/oneclickvirt/ecs/releases/latest" | jq -r '.tag_name')
 
   # 3. 偵測系統指令集 (x86_64 -> amd64, aarch64 -> arm64)
   local SYS_ARCH
@@ -311,7 +309,7 @@ ecs_download() {
 
   # 4. 組合下載 URL 並選擇下載
   local FILENAME="goecs_linux_${DL_ARCH}.zip"
-  local DOWNLOAD_URL="https://github.com/oneclickvirt/ecs/releases/download/${LATEST_TAG}/${FILENAME}"
+  local DOWNLOAD_URL="https://files.gebu8f.com/files/${FILENAME}"
   local ZIPPED_FILE_PATH="${TEMP_WORKDIR}/${FILENAME}"
 
   # 執行下載
@@ -369,25 +367,17 @@ ecs_simple_static() (
 
   #--- 2. 只保留「系統資訊」區塊 ------------------------------------
   local extracted_block=$(awk -v kw="$title_keyword" '
-    # 規則1: 只要找到包含關鍵字的行，就打開 "found" 開關
-    $0 ~ kw { found=1 }
-    
-    # 規則2: 只要 "found" 開關是打開的，就執行以下操作
+    $0 ~ kw { found = 1 }                # 找到關鍵字行，開始輸出
     found {
-        # 動作1: 打印當前行
         print
-        
-        # 動作2: 檢查是否滿足 "終結條件"
-        # 條件是：以 "---" 開頭，並且不包含我們的關鍵字
-        if ($0 ~ /^---/ && $0 !~ kw) {
-            exit # 滿足條件，打印完後立刻退出
-        }
+        if ($0 ~ /^---/ && $0 !~ kw)     # 碰到下一個分隔線就退出
+            exit
     }
   ' "$TEMP_OUTPUT")
   
   aha --title "$t_title" --stylesheet <<< "$extracted_block" > "$TEMP_HTML"
   sed -i '/<\/style>/i \
-    body { background-color: #0c0c0c; color: #cccccc; font-family: "Noto Sans CJK SC", "Noto Sans CJK TC", "Noto Sans", "Noto Sans Mono", "Noto Color Emoji", "Segoe UI Emoji", "Apple Color Emoji", "Courier New", monospace; padding: 20px; } \
+    body { background-color: #0c0c0c; color: #cccccc; font-family: "Noto Color Emoji", "Noto Sans CJK SC", "Noto Sans CJK TC", "Noto Sans", "Noto Sans Mono", "Segoe UI Emoji", "Apple Color Emoji", "Courier New", monospace; padding: 20px; } \
     pre { white-space: pre-wrap; word-wrap: break-word; }' "$TEMP_HTML"
   wkhtmltoimage \
     --width 800 \
@@ -426,9 +416,11 @@ hardware_benchmarks() (
   echo "$goecs_output"
 
   # --- 步驟 3: 執行 yabs.sh 並捕獲輸出 ---
-  echo "$hardware_benchmarks_3"
-  local yabs_output=$(curl -sL https://yabs.sh | bash -s -- -fi6)
-  echo "$yabs_output"
+  if [ $gb == true ]; then
+    echo "$hardware_benchmarks_3"
+    local yabs_output=$(curl -sL https://yabs.sh | bash -s -- -fi6)
+    echo "$yabs_output"
+  fi
   
   # --- 步驟 4: 解析所有捕獲的輸出 ---
 
@@ -437,9 +429,11 @@ hardware_benchmarks() (
   local sys_multi_score=$(echo "$goecs_output" | grep 'Thread(s) Test:' | tail -n 1 | awk '{print $NF}')
 
   # Geekbench 6 (先切割區塊再解析，更穩定)
-  local gb6_section=$(echo "$yabs_output" | awk '/Geekbench 6 Benchmark Test:/, /YABS completed in/ {if ($0 !~ /YABS completed in/) print}')
-  local gb6_single_score=$(echo "$gb6_section" | grep 'Single Core' | awk '{print $4}')
-  local gb6_multi_score=$(echo "$gb6_section" | grep 'Multi Core' | awk '{print $4}')
+  if [ $gb == true ]; then
+    local gb6_section=$(echo "$yabs_output" | awk '/Geekbench 6 Benchmark Test:/, /YABS completed in/ {if ($0 !~ /YABS completed in/) print}')
+    local gb6_single_score=$(echo "$gb6_section" | grep 'Single Core' | awk '{print $4}')
+    local gb6_multi_score=$(echo "$gb6_section" | grep 'Multi Core' | awk '{print $4}')
+  fi
 
   # 記憶體解析 (採用您優化的版本)
   local mem_write_speed=$(echo "$goecs_output" \
@@ -525,10 +519,12 @@ hardware_benchmarks() (
       echo "${t_multi}：${sys_multi_score:-N/A}"
     fi
     echo ""
-    echo "## $t_cpu_gb6"
-    echo "${t_single}：${gb6_single_score:-N/A}"
-    echo "${t_multi}：${gb6_multi_score:-N/A}"
-    echo ""
+    if [ $gb == true ]; then
+      echo "## $t_cpu_gb6"
+      echo "${t_single}：${gb6_single_score:-N/A}"
+      echo "${t_multi}：${gb6_multi_score:-N/A}"
+      echo ""
+    fi
     echo "## $t_memory"
     echo "${t_read}：${mem_read_speed:-N/A}"
     echo "${t_write}：${mem_write_speed:-N/A}"
@@ -964,6 +960,23 @@ net_quality() {
 
   echo -e "${CYAN}$net_quality_1...${RESET}"
   
+  declare -A pkg_map=(
+    ["stun"]="stun-client"
+    ["convert"]="imagemagick"
+    ["mtr"]="mtr"
+    ["iperf3"]="iperf3"
+  )
+  # 逐一檢查並安裝
+  for cmd in "${!pkg_map[@]}"; do
+    if ! command -v "$cmd" >/dev/null 2>&1; then
+      pkg="${pkg_map[$cmd]}"
+      case "$system" in
+      1) apt update -qq && apt install -y "$pkg" ;;
+      2) yum install -y "$pkg" ;;
+      esac
+    fi
+  done
+  
   mkdir -p "$RESULT_DIR"
 
   case $lang in
@@ -996,7 +1009,7 @@ net_quality() {
     } \
     \
     span[style*="color:red"] { color: #ff5555 !important; text-shadow: 0 0 3px #7f2222; } \
-    span[style*="color:green"] { color: #586e44 !important; text-shadow: 0 0 3px #003d00; } \
+    span[style*="color:green"] { color: #586e44 !important; font-weight: bold !important; text-shadow: 0 0 3px #203314; } \
     span[style*="color:yellow"] { color: #f1fa8c !important; text-shadow: 0 0 3px #7a751e; } \
     span[style*="color:blue"] { color: #61afef !important; text-shadow: 0 0 3px #234a7a; } \
     span[style*="color:cyan"] { color: #8be9fd !important; text-shadow: 0 0 3px #236b7a; } \
@@ -1004,14 +1017,14 @@ net_quality() {
     span[style*="color:gray"], span[style*="color:dimgray"] { color: #9e9e9e !important; } \
     span[style*="color:white"] { color: #e6e6e6 !important; } \
     span[style*="color:olive"]{ color: #f1fa8c !important; } \
-    span[style*="color:teal"] { color: #3d5857 !important; } \
+    span[style*="color:teal"] { color: #3c4d47 !important; font-weight: bold !important; } \
     \
     span[style*="background-color:red"] { background-color: #8b0000 !important; color: #fff !important; } \
     span[style*="background-color:green"] { background-color: #586e44 !important; color: #fff !important; } \
-    span[style*="background-color:blue"] { background-color: #003366 !important; color: #fff !important; } \
+    span[style*="background-color:blue"] { background-color: #1149c5 !important; color: #fff !important; } \
     span[style*="background-color:cyan"] { background-color: #004b4b !important; color: #fff !important; } \
     span[style*="background-color:yellow"] { background-color: #7a6e00 !important; color: #fff !important; } \
-    span[style*="background-color:purple"], span[style*="background-color:magenta"] { background-color: #4b006e !important; color: #fff !important; } \
+    span[style*="background-color:purple"], span[style*="background-color:magenta"] { background-color: #1149c3 !important; color: #fff !important; } \
     span[style*="background-color:olive"] { background-color: #e8751d !important; color: #ffffff !important; } \
     \
     span[style*="text-decoration:underline"] { \
@@ -1022,7 +1035,7 @@ net_quality() {
   <\/style>' "$TEMP_HTML"
 
   wkhtmltoimage \
-    --width 800 \
+    --width 1000 \
     --quality 100 \
     --encoding utf-8 \
     "$TEMP_HTML" \
@@ -1033,6 +1046,22 @@ net_rounting() {
   if [[ "$lang" != cn ]]; then
     return 0
   fi
+  declare -A pkg_map=(
+    ["stun"]="stun-client"
+    ["convert"]="imagemagick"
+    ["mtr"]="mtr"
+    ["iperf3"]="iperf3"
+  )
+  # 逐一檢查並安裝
+  for cmd in "${!pkg_map[@]}"; do
+    if ! command -v "$cmd" >/dev/null 2>&1; then
+      pkg="${pkg_map[$cmd]}"
+      case "$system" in
+      1) apt update -qq && apt install -y "$pkg" ;;
+      2) yum install -y "$pkg" ;;
+      esac
+    fi
+  done
   # --- 設定 ---
   local RESULT_DIR="$HOME/result"
   local OFFICIAL_ANSI_OUTPUT="$TEMP_WORKDIR/rounting.ansi"
@@ -1068,7 +1097,7 @@ net_rounting() {
     } \
     \
     span[style*="color:red"] { color: #ff5555 !important; text-shadow: 0 0 3px #7f2222; } \
-    span[style*="color:green"] { color: #586e44 !important; text-shadow: 0 0 3px #003d00; } \
+    span[style*="color:green"] { color: #586e44 !important; font-weight: bold !important; text-shadow: 0 0 3px #203314; } \
     span[style*="color:yellow"] { color: #f1fa8c !important; text-shadow: 0 0 3px #7a751e; } \
     span[style*="color:blue"] { color: #61afef !important; text-shadow: 0 0 3px #234a7a; } \
     span[style*="color:cyan"] { color: #8be9fd !important; text-shadow: 0 0 3px #236b7a; } \
@@ -1076,11 +1105,11 @@ net_rounting() {
     span[style*="color:gray"], span[style*="color:dimgray"] { color: #9e9e9e !important; } \
     span[style*="color:white"] { color: #e6e6e6 !important; } \
     span[style*="color:olive"]{ color: #f1fa8c !important; text-shadow: 0 0 3px #7a751e; } \
-    span[style*="color:teal"] { color: #3d5857 !important; text-shadow: 0 0 3px #1a2c2b; } \
+    span[style*="color:teal"] { color: #3c4d47 !important; font-weight: bold !important; } \
     \
     span[style*="background-color:red"] { background-color: #8b0000 !important; color: #fff !important; } \
     span[style*="background-color:green"] { background-color: #586e44 !important; color: #fff !important; } \
-    span[style*="background-color:blue"] { background-color: #003366 !important; color: #fff !important; } \
+    span[style*="background-color:blue"] { background-color: #1149c5 !important; color: #fff !important; } \
     span[style*="background-color:cyan"] { background-color: #004b4b !important; color: #fff !important; } \
     span[style*="background-color:yellow"] { background-color: #7a6e00 !important; color: #fff !important; } \
     span[style*="background-color:purple"], span[style*="background-color:magenta"] { background-color: #4b006e !important; color: #fff !important; } \
@@ -1116,10 +1145,8 @@ streaming_unlock() {
   mkdir -p "$RESULT_DIR"
 
   # 執行指令並捕獲輸出
-  script -qfc "bash <(curl -L -s check.unlock.media) -E en -R 0" /dev/null > "$RAW_ANSI_OUTPUT"
+  script -qfc "bash <(curl -Ls https://raw.githubusercontent.com/lmc999/RegionRestrictionCheck/refs/heads/main/check.sh) -E en -R 0" /dev/null > "$RAW_ANSI_OUTPUT"
   
-  # 過濾輸出：從第一個 "** Checking Results Under" 開始，
-  # 直到 "Testing Done!" 的前一行（也就是最後一個 "===" 行）
   awk '
     /\*\* Checking Results Under/ { found=1 }
     found {
@@ -1137,6 +1164,7 @@ streaming_unlock() {
   mv "${RAW_ANSI_OUTPUT}.tmp" "$RAW_ANSI_OUTPUT"
   
   cat "$RAW_ANSI_OUTPUT"
+  sed -i 's/\r//g; /^$/d' "$RAW_ANSI_OUTPUT"
   
   # 轉換為 HTML
   aha --title "$streaming_unlock_2" < "$RAW_ANSI_OUTPUT" > "$TEMP_HTML"
@@ -1146,8 +1174,8 @@ streaming_unlock() {
     <style type="text/css"> \
       body { background-color: #1e1e1e !important; font-family: "DejaVu Sans Mono", "Courier New", monospace; padding: 25px; } \
       pre { color: #d8d8d8; white-space: pre-wrap; word-wrap: break-word; font-size: 14px; line-height: 1.4; } \
-      span[style*="color:red"] { color: #e06c75 !important; } \
-      span[style*="color:green"] { color: #98c379 !important; } \
+      span[style*="color:red"] { color: #ff5555 !important; text-shadow: none !important; } \
+      span[style*="color:green"] { color: #93d367 !important; } \
       span[style*="color:teal"] { color: #56b6c2 !important; } \
       span[style*="color:olive"] { color: #d19a66 !important; } \
       span[style*="color:dimgray"] { color: #5c6370 !important; } \
@@ -1313,6 +1341,9 @@ regional_speedtest() {
 }
 
 speedtest_global() {
+  if [[ "$ip" == "v6" ]]; then
+    return 0
+  fi
   local RESULT_DIR="$HOME/result"
   local output_file="${RESULT_DIR}/global_net.txt"
   mkdir -p "$RESULT_DIR"
@@ -1375,8 +1406,8 @@ ping_test(){
       local t_packet_loss="丢包率"
       ;;
     us)
-      local t_start="Starting latency tests..." # <--- Style Fix
-      local t_title="## Latency Test"         # <--- Style Fix: Singular is better
+      local t_start="Starting latency tests..." 
+      local t_title="## Latency Test"
       local t_region="Region"
       local t_avg_latency="Average Latency"
       local t_packet_loss="Packet Loss"
@@ -1390,8 +1421,7 @@ ping_test(){
       ;;
   esac
 
-  echo -e "${CYAN}${t_start}${RESET}" # <--- Style Fix: Added color
-
+  echo -e "${CYAN}${t_start}${RESET}"
   case $lang in
   us)
     pinginp="en"
@@ -1409,28 +1439,19 @@ ping_test(){
     echo "| $t_region | $t_avg_latency | $t_packet_loss |"
     echo "|:---|:---|:---|"
 
-    # --- [核心修正] ---
-    # 使用更穩健的正規表示式來匹配分隔線
-    # /^---/ 匹配任何以至少三個連字號開頭的行
-    echo "$ping_output" | sed -n '/^---/,$p' | tail -n +2 | \
-      while IFS= read -r line; do
-        # 處理空行或非數據行
-        [ -z "$line" ] && continue
-        # 增加一個檢查，確保行內有 IP 地址，過濾掉可能的頁尾文字
-        ! [[ "$line" =~ [0-9]+\.[0-9]+\.[0-9]+\.[0-9]+ ]] && continue
-
-        # 從行尾提取丟包率 (最後一個欄位)
-        loss=$(echo "$line" | awk '{print $NF}')
-        
-        # 提取延遲時間 (倒數第三和第二個欄位，例如 "123.456 ms")
-        avg=$(echo "$line" | awk '{print $(NF-2), $(NF-1)}')
-
-        # [優化] 使用更穩健的方式提取地區名稱
-        # 打印除了最後四個字段（IP, avg, ms, loss）之外的所有內容
-        region=$(echo "$line" | awk '{ for(i=1; i<=NF-4; i++) printf "%s ", $i; printf "\n" }' | sed 's/[[:space:]]*$//')
-
-        echo "| $region | $avg | $loss |"
-      done
+    # 自動略過前兩行（表頭與分隔線）
+    echo "$ping_output" | awk '
+    NR <= 2 { next }                 # 跳過前兩行
+    NF < 3 { next }                  # 欄位太少跳過
+    !($0 ~ /ms/) { next }            # 無 ms 的行跳過
+    {
+      loss=$NF                       # 最後一欄是丟包率
+      avg=$(NF-2) " " $(NF-1)        # 倒數第三 + 倒數第二欄是延遲
+      region=""
+      for (i=1; i<=NF-3; i++) region=region $i " "
+      sub(/[ \t]+$/, "", region)
+      printf("| %s | %s | %s |\n", region, avg, loss)
+    }'
   } > "$report"
 
 }
@@ -1566,7 +1587,7 @@ all_report() {
     echo "$t_streaming" >> $report
     echo "[IMG 4]" >> $report
   fi
-  cat "$RESULT_DIR/global_net.txt" >> $report
+  [ -f $RESULT_DIR/global_net.txt ] && cat "$RESULT_DIR/global_net.txt" >> $report
   [ -f $RESULT_DIR/regional_net.txt ] && cat "$RESULT_DIR/regional_net.txt" >> $report
   cat "$RESULT_DIR"/ping.txt >> $report
   [ -f $RESULT_DIR/stability_net.txt ] && {
@@ -1592,7 +1613,19 @@ case $1 in
   exit 0
   ;;
 esac
-curl -s --connect-timeout 3 https://api4.ipify.org >/dev/null || { echo "${RED}You do not have ipv4, this script must require ipv4 to work properly${RESET}"; exit 1; }
+if curl -s --connect-timeout 3 https://api4.ipify.org >/dev/null; then
+  ipa=v4
+elif curl -s --connect-timeout 3 https://api6.ipify.org >/dev/null; then
+  ipa=v6
+else
+  echo -e "${RED}您的網路不通，請稍後再試（Your network is down, please try again later）${RESET}"
+  exit 1
+fi
+if curl -s --connect-timeout 3 https://browser.geekbench.com >/dev/null; then
+  gb=true
+else
+  gb=false
+fi
 
 TEMP_WORKDIR=$(mktemp -d)
 trap 'rm -rf "$TEMP_WORKDIR"' EXIT
