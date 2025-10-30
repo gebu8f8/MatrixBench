@@ -33,7 +33,7 @@ YELLOW='\033[1;33m'  # ⚠️ 警告用黃色
 CYAN="\033[1;36m"    # ℹ️ 一般提示用青色
 RESET='\033[0m'      # 清除顏色
 
-version="v2025.10.29"
+version="v2025.10.30"
 
 lang(){
   # 語言設定函式 - 目前使用命令行參數控制
@@ -115,67 +115,6 @@ check_system(){
     exit 1
   fi
 }
-install_wkhtmltox() {
-  local ARCH=$(uname -m)
-  local TEMP_WORKDIR="/tmp/wkhtmltox_install"
-  mkdir -p "$TEMP_WORKDIR"
-
-  # --- 判斷發行版類型 ---
-  if [ -f /etc/fedora-release ]; then
-    yum install -y "https://github.com/wkhtmltopdf/packaging/releases/download/0.12.6.1-3/wkhtmltox-0.12.6.1-3.fedora37.x86_64.rpm"
-  elif [ -f /etc/redhat-release ]; then
-    local RHEL_VER=$(grep -oE '[0-9]+' /etc/redhat-release | head -n1)
-    if [ "$RHEL_VER" -ge 9 ]; then
-      RHEL_VER=9
-    else
-      RHEL_VER=8
-    fi
-    # 下載 RPM 安裝包
-    local RPM_URL="https://github.com/wkhtmltopdf/packaging/releases/download/0.12.6.1-3/wkhtmltox-0.12.6.1-3.almalinux$.$ARCH.rpm"
-        local RPM_PATH="$TEMP_WORKDIR/wkhtmltox.rpm"
-
-    if yum install -y $RPM_URL; then
-      echo -e "${GREEN}wkhtmltox installed successfully on CentOS/AlmaLinux.${RESET}"
-    else
-      echo -e "${RED}Failed to download wkhtmltox RPM package.${RESET}"
-      exit 1
-    fi
-  else
-    if ! dpkg -l | grep -q "libssl1.1"; then
-      local LIBSSL_URL=""
-      if [ "$ARCH" = "x86_64" ]; then
-        LIBSSL_URL="https://ftp.us.debian.org/debian/pool/main/o/openssl/libssl1.1_1.1.1w-0+deb11u1_amd64.deb"
-      elif [ "$ARCH" = "aarch64" ]; then
-        LIBSSL_URL="https://ftp.us.debian.org/debian/pool/main/o/openssl/libssl1.1_1.1.1w-0+deb11u1_arm64.deb"
-      fi
-      if [ -n "$LIBSSL_URL" ]; then
-        local LIBSSL_PATH="$TEMP_WORKDIR/libssl1.1.deb"
-        curl -sL -o "$LIBSSL_PATH" "$LIBSSL_URL" && dpkg -i "$LIBSSL_PATH"
-      fi
-    fi
-    # 安裝 wkhtmltox 主體
-    local WK_VER="0.12.6-1"
-    local DEB_URL=""
-    if [ "$ARCH" = "x86_64" ]; then
-      DEB_URL="https://github.com/wkhtmltopdf/packaging/releases/download/${WK_VER}/wkhtmltox_${WK_VER}.buster_amd64.deb"
-    elif [ "$ARCH" = "aarch64" ]; then
-      DEB_URL="https://github.com/wkhtmltopdf/packaging/releases/download/${WK_VER}/wkhtmltox_${WK_VER}.buster_arm64.deb"
-    fi
-
-    if [ -n "$DEB_URL" ]; then
-      local DEB_PATH="$TEMP_WORKDIR/wkhtmltox.deb"
-      if curl -sL -o "$DEB_PATH" "$DEB_URL"; then
-        dpkg -i "$DEB_PATH" || apt -f install -y
-        echo -e "${GREEN}wkhtmltox installed successfully on Debian/Ubuntu.${RESET}"
-      else
-        echo -e "${RED}Failed to download wkhtmltox DEB package.${RESET}"
-                return 1
-      fi
-    fi
-  fi
-  return 0
-}
-
 
 check_app(){
   # 根據系統選擇 script 對應套件
@@ -187,7 +126,6 @@ check_app(){
 
   # 定義指令與套件對應關係
   declare -A pkg_map=(
-    ["stress-ng"]="stress-ng"
     ["sar"]="sysstat"
     ["curl"]="curl"
     ["jq"]="jq"
@@ -199,6 +137,7 @@ check_app(){
     ["bc"]="bc"
     ["cyclictest"]="rt-tests"
     ["sysbench"]="sysbench"
+    ["convert"]="imagemagick"
   )
   if [ $system == 2 ]; then
     if ! yum repolist enabled | grep -q "epel"; then
@@ -238,40 +177,6 @@ check_app(){
         ;;
       esac
       fc-cache -fv >/dev/null 2>&1
-    fi
-  fi
-  if ! command -v wkhtmltoimage >/dev/null 2>&1; then
-    case $system in
-    1)
-      apt install -y wkhtmltopdf
-      ;;
-    2)
-      yum install -y wkhtmltopdf
-      ;;
-    esac
-    if ! command -v "wkhtmltoimage" &> /dev/null; then
-      install_wkhtmltox_manual
-    fi
-  fi
-}
-compress_png() {
-  local image_path="$1"
-
-  if [[ ! -f "$image_path" ]]; then
-    echo -e "${RED}$compress_png_1'${image_path}'${RESET}" >&2
-    return 1
-  fi
-
-
-  # 步驟 4：執行壓縮命令
-  pngquant --quality 70-100 --ext .png --force --skip-if-larger "$image_path" 1>/dev/null
-
-  if [[ $? -eq 0 ]]; then
-    sync
-  else
-    if ! [[ $? -eq 99 ]]; then
-      echo -e "${RED}${RESET}" >&2
-      return 1
     fi
   fi
 }
@@ -379,15 +284,11 @@ ecs_simple_static() (
   sed -i '/<\/style>/i \
     body { background-color: #0c0c0c; color: #cccccc; font-family: "Noto Color Emoji", "Noto Sans CJK SC", "Noto Sans CJK TC", "Noto Sans", "Noto Sans Mono", "Segoe UI Emoji", "Apple Color Emoji", "Courier New", monospace; padding: 20px; } \
     pre { white-space: pre-wrap; word-wrap: break-word; }' "$TEMP_HTML"
-  wkhtmltoimage \
-    --width 800 \
-    --height 0 \
-    --quality 100 \
-    --encoding utf-8 \
-    --enable-local-file-access \
-    "$TEMP_HTML" \
-    "$FINAL_IMAGE_FILE" >/dev/null 2>&1
-    compress_png "$FINAL_IMAGE_FILE"
+  $chromium_comm --headless --no-sandbox --disable-gpu \
+    --screenshot=$FINAL_IMAGE_FILE\
+    --window-size=1000,1000 \
+    file://$TEMP_HTML
+  mogrify -trim $FINAL_IMAGE_FILE
 )
 
 hardware_benchmarks() (
@@ -941,14 +842,12 @@ ip_quality() {
       text-decoration-color: currentColor !important; \
     } \
   <\/style>' "$TEMP_HTML"
-
-  wkhtmltoimage \
-    --width 700 \
-    --quality 100 \
-    --encoding utf-8 \
-    "$TEMP_HTML" \
-    "$FINAL_IMAGE_FILE" >/dev/null 2>&1
-  compress_png $FINAL_IMAGE_FILE
+  
+  $chromium_comm --headless --no-sandbox --disable-gpu \
+    --screenshot=$FINAL_IMAGE_FILE\
+    --window-size=1000,2000 \
+    file://$TEMP_HTML >/dev/null 2>&1
+  mogrify -trim $FINAL_IMAGE_FILE
 }
 
 net_quality() {
@@ -962,7 +861,6 @@ net_quality() {
   
   declare -A pkg_map=(
     ["stun"]="stun-client"
-    ["convert"]="imagemagick"
     ["mtr"]="mtr"
     ["iperf3"]="iperf3"
   )
@@ -971,7 +869,10 @@ net_quality() {
     if ! command -v "$cmd" >/dev/null 2>&1; then
       pkg="${pkg_map[$cmd]}"
       case "$system" in
-      1) apt update -qq && apt install -y "$pkg" ;;
+      1) 
+        export DEBIAN_FRONTEND=noninteractive
+        apt update -qq && apt install -y "$pkg"
+        ;;
       2) yum install -y "$pkg" ;;
       esac
     fi
@@ -1033,14 +934,11 @@ net_quality() {
       text-decoration-color: currentColor !important; \
     } \
   <\/style>' "$TEMP_HTML"
-
-  wkhtmltoimage \
-    --width 1000 \
-    --quality 100 \
-    --encoding utf-8 \
-    "$TEMP_HTML" \
-    "$FINAL_IMAGE_FILE" >/dev/null 2>&1
-  compress_png $FINAL_IMAGE_FILE
+  $chromium_comm --headless --no-sandbox --disable-gpu \
+    --screenshot=$FINAL_IMAGE_FILE\
+    --window-size=1000,2000 \
+    file://$TEMP_HTML >/dev/null 2>&1
+  mogrify -trim $FINAL_IMAGE_FILE
 }
 net_rounting() {
   if [[ "$lang" != cn ]]; then
@@ -1057,7 +955,10 @@ net_rounting() {
     if ! command -v "$cmd" >/dev/null 2>&1; then
       pkg="${pkg_map[$cmd]}"
       case "$system" in
-      1) apt update -qq && apt install -y "$pkg" ;;
+      1)
+        export DEBIAN_FRONTEND=noninteractive
+        apt update -qq && apt install -y "$pkg"
+        ;;
       2) yum install -y "$pkg" ;;
       esac
     fi
@@ -1086,6 +987,8 @@ net_rounting() {
       font-family: "Noto Sans CJK SC", "Noto Sans CJK TC", "Noto Sans", "Noto Sans Mono", "Noto Color Emoji", "DejaVu Sans Mono", "Courier New", monospace; \
       padding: 25px; \
       color: #cfcfcf; \
+      letter-spacing: 0 !important; \
+      word-spacing: 0 !important; \
     } \
     pre { \
       color: #cfcfcf; \
@@ -1124,15 +1027,12 @@ net_rounting() {
       text-decoration-color: currentColor !important; \
     } \
   <\/style>' "$TEMP_HTML"
-
-
-  wkhtmltoimage \
-    --width 1000 \
-    --quality 100 \
-    --encoding utf-8 \
-    "$TEMP_HTML" \
-    "$FINAL_IMAGE_FILE" >/dev/null 2>&1
-  compress_png $FINAL_IMAGE_FILE
+  
+  $chromium_comm --headless --no-sandbox --disable-gpu \
+    --screenshot=$FINAL_IMAGE_FILE\
+    --window-size=1200,2000 \
+    file://$TEMP_HTML >/dev/null 2>&1
+  mogrify -trim $FINAL_IMAGE_FILE
 }
 streaming_unlock() {
   local RAW_ANSI_OUTPUT="${TEMP_WORKDIR}/streaming_report.ansi"
@@ -1185,13 +1085,11 @@ streaming_unlock() {
       span[style*="background-color:olive"] { background-color: #8a7a3a !important; } \
     <\/style>' "$TEMP_HTML"
     
-  wkhtmltoimage \
-    --width 700 \
-    --quality 100 \
-    --encoding utf-8 \
-    "$TEMP_HTML" \
-    "$FINAL_IMAGE_FILE" >/dev/null 2>&1
-  compress_png $FINAL_IMAGE_FILE
+  $chromium_comm --headless --no-sandbox --disable-gpu \
+    --screenshot=$FINAL_IMAGE_FILE\
+    --window-size=1000,2000 \
+    file://$TEMP_HTML >/dev/null 2>&1
+  mogrify -trim $FINAL_IMAGE_FILE
 }
 speedtest_data() {
   local raw_data="$1"
@@ -1281,65 +1179,6 @@ speedtest_data() {
   }
 }
 
-regional_speedtest() {
-  local region=""
-  local server_city="$1"
-  local RESULT_DIR="$HOME/result"
-  local output_file="${RESULT_DIR}/regional_net.txt"
-  local info=$(curl -s --max-time 4 "https://ipwho.is/?fields=country_code,continent_code")
-  local continent_code=$(echo "$info" | jq -r '.continent_code')
-  local country_code=$(echo "$info" | jq -r '.country_code')
-  if [ -z "$country_code" ] || [ -z "$continent_code" ]; then
-    echo -e "${YELLOW}$regional_speedtest_1${RESET}"
-    return
-  fi
-  case "$country_code" in
-  CN) region="china" ;;
-  IN) region="india" ;;
-  RU) region="russia" ;;
-  IR) region="iran" ;;
-  AE|SA|TR|IL|QA|KW|OM|BH|JO|LB|SY|YE) region="middle-east" ;;  # 常見中東國家
-  *)
-    # 再用洲別判斷
-    case "$continent_code" in
-    NA) region="na" ;;
-    EU) region="eu" ;;
-    AS) region="asia" ;;
-    OC) region="au" ;;
-    SA) region="sa" ;;
-    AF) region="africa" ;;
-    *) echo "$regional_speedtest_2"; return ;;
-    esac
-    ;;
-  esac
-  # 根據語言設定文字
-  case "$lang" in
-    cn)
-      local t_running="正在执行区域网络测速 (区域: ${region})，这可能需要 5-20 分钟..."
-      local t_report="## ${region^^}区域网络速度测试报告 (前10名与后3名)"
-      ;;
-    us)
-      local t_running="Running regional network speed test (region: ${region}), this may take 5-20 minutes..."
-      local t_report="## ${region^^} Regional Network Speed Test Report (Top 10 and Bottom 3)"
-      ;;
-    *)
-      local t_running="正在執行區域網路測速 (區域: ${region})，這可能需要 5-20 分鐘..."
-      local t_report="## ${region^^}區域網路速度測試報告 (前10名與後3名)"
-      ;;
-  esac
-
-  echo "$t_running"
-  local regional_output=$(wget -qO- nws.sh | bash -s -- -r "$region" 2>/dev/null | sed 's/\x1b\[[0-9;]*m//g')
-  echo "$regional_output"
-
-  local speedtest_section=$(echo "$regional_output" | sed -n '/Speedtest.net/,/Avg DL Speed/p' | sed '$d')
-    
-  {
-    echo "$t_report"
-    speedtest_data "$speedtest_section" "$server_city"
-  } > "$output_file"
-}
-
 speedtest_global() {
   if [[ "$ip" == "v6" ]]; then
     return 0
@@ -1353,17 +1192,14 @@ speedtest_global() {
     cn)
       local t_running="正在执行全球网络测速，这可能需要 15-30 分钟，请耐心等待..."
       local t_report="## 全球网络速度测试报告 (前10名与后3名)"
-      local t_warning="警告：侦测到速率限制，将跳过区域测速。"
       ;;
     us)
       local t_running="Running global network speed test. This may take 15-30 minutes, please be patient..."
       local t_report="## Global Network Speed Test Report (Top 10 and Bottom 3)"
-      local t_warning="Warning: Rate limiting detected, skipping regional speed test."
       ;;
     *)
       local t_running="正在執行全球網路測速，這可能需要 15-30 分鐘，請耐心等待..."
       local t_report="## 全球網路速度測試報告 (前10名與後3名)"
-      local t_warning="警告：偵測到速率限制，將跳過區域測速。"
       ;;
   esac
 
@@ -1382,14 +1218,6 @@ speedtest_global() {
         speedtest_data "$speedtest_section" "$server_city"
     } > "$output_file"
     
-    # 【核心】最终的、更全面的速率限制检查
-    if echo "$global_output" | grep -q -i -E "rate limit|throttled|speed cap|FAILED - IP has been rate limited"; then
-        echo -e "${YELLOW}$t_warning${RESET}"
-    else
-        echo "Please wait 10 minutes for the speedtest to rest to avoid rate limiting issues"
-        sleep 600
-        regional_speedtest "$server_city"
-    fi
 }
 
 ping_test(){
@@ -1588,7 +1416,6 @@ all_report() {
     echo "[IMG 4]" >> $report
   fi
   [ -f $RESULT_DIR/global_net.txt ] && cat "$RESULT_DIR/global_net.txt" >> $report
-  [ -f $RESULT_DIR/regional_net.txt ] && cat "$RESULT_DIR/regional_net.txt" >> $report
   cat "$RESULT_DIR"/ping.txt >> $report
   [ -f $RESULT_DIR/stability_net.txt ] && {
     echo "$t_stability" >> $report
@@ -1721,6 +1548,22 @@ while [[ $# -gt 0 ]]; do
   esac
 done
 lang
+if $run_all || $do_hw || $do_ip || $do_nq || $do_nr || $do_stream; then
+  case $system in
+  1)
+    if ! command -v chromium >/dev/null 2>&1; then
+      apt install -y chromium || snap install chromium
+    fi
+    ;;
+  2)
+    if ! command -v chromium-browser >/dev/null 2>&1; then
+      yum install -y chromium
+    fi
+    ;;
+  esac
+  command -v chromium && chromium_comm="chromium"
+  command -v chromium-browser && chromium_comm="chromium-browser"
+fi
 # --- 執行對應功能 ---
 if $run_all; then
   ecs_download
