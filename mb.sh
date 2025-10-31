@@ -26,6 +26,8 @@ if [ "$(id -u)" -ne 0 ]; then
 fi
 lang=internationality
 run_all=true
+LOG_FILE="/var/log/matrixbench_error.log"
+set -o errtrace
 # 顏色定義
 RED="\033[1;31m"    # ❌ 錯誤用紅色
 GREEN="\033[1;32m"   # ✅ 成功用綠色
@@ -33,7 +35,45 @@ YELLOW='\033[1;33m'  # ⚠️ 警告用黃色
 CYAN="\033[1;36m"    # ℹ️ 一般提示用青色
 RESET='\033[0m'      # 清除顏色
 
-version="v2025.10.30"
+version="v2025.10.31"
+
+handle_error() {
+    local exit_code=$?
+    local failed_command="$BASH_COMMAND"
+    local line_number=${BASH_LINENO[0]}
+    
+    # --- 新增功能：提供更豐富的上下文 ---
+    # caller 指令可以提供完整的函式調用堆疊
+    local call_stack=$(caller 0)
+    
+    # 嘗試獲取觸發錯誤的原始腳本行
+    # 這不一定 100% 準確，但提供了極好的線索
+    local source_line=$(sed -n "${line_number}p" "$0" | sed 's/^[ \t]*//;s/[ \t]*$//')
+
+    # --- 格式化錯誤訊息 v2.0 ---
+    local error_message="An error occurred with exit code ${exit_code}."
+
+    # 寫入日誌
+    echo "[$(date '+%Y-%m-%d %H:%M:%S')] === ERROR REPORT ===" >> "$LOG_FILE"
+    echo "[$(date '+%Y-%m-%d %H:%M:%S')] Exit Code: ${exit_code}" >> "$LOG_FILE"
+    echo "[$(date '+%Y-%m-%d %H:%M:%S')] Location:  Line ${line_number} (Function call stack: ${call_stack})" >> "$LOG_FILE"
+    echo "[$(date '+%Y-%m-%d %H:%M:%S')] Command:   ${failed_command}" >> "$LOG_FILE"
+    
+    # 只有當能成功讀取到原始碼時，才顯示這一行
+    if [[ -n "$source_line" ]]; then
+      echo "[$(date '+%Y-%m-%d %H:%M:%S')] Source:    ${source_line}" >> "$LOG_FILE"
+    fi
+    
+    echo "[$(date '+%Y-%m-%d %H:%M:%S')] ===================" >> "$LOG_FILE"
+}
+
+log_session_start() {
+    echo "============================================================" >> "$LOG_FILE"
+    echo "[$(date '+%Y-%m-%d %H:%M:%S')] MatrixBench session started." >> "$LOG_FILE"
+    # 記錄下傳遞給腳本的所有參數
+    echo "[$(date '+%Y-%m-%d %H:%M:%S')] User parameters: $@" >> "$LOG_FILE"
+    echo "------------------------------------------------------------" >> "$LOG_FILE"
+}
 
 lang(){
   # 語言設定函式 - 目前使用命令行參數控制
@@ -142,6 +182,12 @@ check_app(){
   if [ $system == 2 ]; then
     if ! yum repolist enabled | grep -q "epel"; then
       yum install -y epel-release
+    fi
+  fi
+  if [ "$system" -eq 1 ]; then
+    # 檢查 apt 列表是否在最近一小時內更新過，如果沒有，才執行更新
+    if [ -z "$(find /var/lib/apt/lists -maxdepth 1 -mmin -60)" ]; then
+      apt update
     fi
   fi
 
@@ -845,7 +891,7 @@ ip_quality() {
   
   $chromium_comm --headless --no-sandbox --disable-gpu \
     --screenshot=$FINAL_IMAGE_FILE\
-    --window-size=1000,2000 \
+    --window-size=2000,10000 \
     file://$TEMP_HTML >/dev/null 2>&1
   mogrify -trim $FINAL_IMAGE_FILE
 }
@@ -936,7 +982,7 @@ net_quality() {
   <\/style>' "$TEMP_HTML"
   $chromium_comm --headless --no-sandbox --disable-gpu \
     --screenshot=$FINAL_IMAGE_FILE\
-    --window-size=1000,2000 \
+    --window-size=2000,10000 \
     file://$TEMP_HTML >/dev/null 2>&1
   mogrify -trim $FINAL_IMAGE_FILE
 }
@@ -966,7 +1012,7 @@ net_rounting() {
   # --- 設定 ---
   local RESULT_DIR="$HOME/result"
   local OFFICIAL_ANSI_OUTPUT="$TEMP_WORKDIR/rounting.ansi"
-  local TEMP_HTML="$TEMP_WORKDIR/temp/rounting.html"
+  local TEMP_HTML="$TEMP_WORKDIR/rounting.html"
   local FINAL_IMAGE_FILE="${RESULT_DIR}/CN_rounting.png"
 
   echo -e "${CYAN}开始执行路由追踪检测（需10-20分钟）${RESET}"
@@ -1030,7 +1076,7 @@ net_rounting() {
   
   $chromium_comm --headless --no-sandbox --disable-gpu \
     --screenshot=$FINAL_IMAGE_FILE\
-    --window-size=1200,2000 \
+    --window-size=2000,10000 \
     file://$TEMP_HTML >/dev/null 2>&1
   mogrify -trim $FINAL_IMAGE_FILE
 }
@@ -1204,7 +1250,9 @@ speedtest_global() {
   esac
 
   echo "$t_running"
+  alias curl='if echo "$@" | grep -q "result.nws.sh"; then echo "https://result.nws.sh/local-only"; else command curl "$@"; fi'
   local global_output=$(wget -qO- nws.sh | bash 2>/dev/null | sed 's/\x1b\[[0-9;]*m//g')
+  unalias curl
   echo "$global_output"
 
   # 提取關鍵資訊以供後續使用
@@ -1456,6 +1504,16 @@ fi
 
 TEMP_WORKDIR=$(mktemp -d)
 trap 'rm -rf "$TEMP_WORKDIR"' EXIT
+
+echo -e "${YELLOW}請注意，此腳本會收集您的錯誤信息、錯誤代碼、以及發生錯誤前一個指令或腳本，且也會收集您的變量，蒐集資訊在$LOG_FILE${RESET}" >&2
+echo -e "${YELLOW}Please be advised that this script will collect your error messages, error codes, the command or script executed immediately before the error occurred, and your variables. The collected information will be stored in $LOG_FILE.${RESET}" >&2
+read -p "是否啟用（Enable or disable）？[Default:Y]" confirm
+confirm=${confirm,,}
+if [[ $confirm == y || $confirm == "" ]]; then
+  log_session_start "$@"
+  trap 'handle_error' ERR
+fi
+  
 # 初始化
 check_system
 check_app
@@ -1561,8 +1619,11 @@ if $run_all || $do_hw || $do_ip || $do_nq || $do_nr || $do_stream; then
     fi
     ;;
   esac
-  command -v chromium && chromium_comm="chromium"
-  command -v chromium-browser && chromium_comm="chromium-browser"
+  if command -v chromium >/dev/null 2>&1; then
+    chromium_comm="chromium"
+  elif command -v chromium-browser >/dev/null 2>&1; then
+    chromium_comm="chromium-browser"
+  fi
 fi
 # --- 執行對應功能 ---
 if $run_all; then
@@ -1628,4 +1689,3 @@ else
   [ $lang != us ] && echo "所有數據都在$HOME/result資料夾"
   [ $lang == us ] && echo "All data is in the $HOME/result folder"
 fi
-  
