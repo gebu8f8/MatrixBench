@@ -32,7 +32,6 @@ bash <(curl -sL https://mb.gebu8f.com)
 |`-sgb`| 跳過Geekbench測試|
 |`-hw`| 運行所有硬體相關測試 (基礎信息, 跑分, CPU拓撲, CPU 誠信度)|
 |`-oversell` | **運行獨家的 CPU 誠信度與拓撲分析**|
-
 |`-ip`| 運行 IP 質量檢測|
 |`-nq`| 運行網路質量 (回程路由) 檢測|
 |`-stream`| 運行流媒體解鎖測試|
