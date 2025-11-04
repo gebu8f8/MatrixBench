@@ -29,15 +29,16 @@ bash <(curl -sL https://mb.gebu8f.com)
 | 參數 | 說明 |
 |:------ | :----|
 |`-l <lang>`| 設定腳本語言 (`cn` 為簡體中文, `us` 為英文 , 不選就是繁體中文)|
+|`-sgb`| 跳過Geekbench測試|
 |`-hw`| 運行所有硬體相關測試 (基礎信息, 跑分, CPU拓撲, CPU 誠信度)|
 |`-oversell` | **運行獨家的 CPU 誠信度與拓撲分析**|
+
 |`-ip`| 運行 IP 質量檢測|
 |`-nq`| 運行網路質量 (回程路由) 檢測|
 |`-stream`| 運行流媒體解鎖測試|
 |`-speedtest`| 運行全球 Speedtest 測速|
 |`-ping`| 運行 Ping 延遲測試|
 |`-stability`| 運行 aria2c 大流量下載穩定性測試|
-
 
 ### 使用範例
 
