@@ -41,11 +41,11 @@ bash <(curl -sL https://mb.gebu8f.com) -l cn
 | `-stability`| 运行 aria2c 大流量下载稳定性测试|
 ### 使用范例
 
-*   **只想快速检查 CPU 是否超售？ **
+*   **只想快速检查 CPU 是否超售？**
 ```bash
 bash mb.sh -oversell
 ```
-*   **想做一个全面的硬体和网络评测，但不关心流媒体？ **
+*   **想做一个全面的硬体和网络评测，但不关心流媒体？**
 ```bash
 bash mb.sh -hw -ip -nq -speedtest -ping
 ```
