@@ -29,6 +29,7 @@ bash <(curl -sL https://mb.gebu8f.com) -l cn
 | 参数 | 说明 |
 | :--- | :--- |
 | `-l <lang>`| 设定脚本语言 (`cn` 为简体中文, `us` 为英文 , 不选就是繁体中文)|
+|`-sgb`| 跳过Geekbench测试|
 | `-hw`| 运行所有硬体相关测试 (基础信息, 跑分, CPU拓扑, CPU 诚信度)|
 | `-oversell`| **运行独家的 CPU 诚信度与拓扑分析**|
 | `-ip`| 运行 IP 质量检测|
