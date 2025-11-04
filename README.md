@@ -28,6 +28,8 @@ By default, MatrixBench performs a comprehensive analysis. Use the following opt
 | Option | Description |
 | :---: |:--- |
 |`-l <lang>`| Set the script language (`cn` for Simplified Chinese, `en` for English, leaving it unselected is Traditional Chinese) |
+|`-sgb`| 
+Skip Geekbench Test|
 |`-hw`| **Full Hardware Audit:** Runs all hardware tests, including benchmarks, CPU topology, and our exclusive **CPU Honesty Test**.|
 |`-oversell`| **CPU Honesty Test:** Our exclusive test to see if you're getting the CPU you paid for. |
 | `-ip`        | Performs an in-depth IP quality analysis.                   |
