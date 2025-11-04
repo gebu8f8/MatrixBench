@@ -35,7 +35,7 @@ YELLOW='\033[1;33m'  # ⚠️ 警告用黃色
 CYAN="\033[1;36m"    # ℹ️ 一般提示用青色
 RESET='\033[0m'      # 清除顏色
 
-version="v2025.10.31"
+version="v2025.11.04"
 
 handle_error() {
     local exit_code=$?
@@ -1225,6 +1225,140 @@ speedtest_data() {
   }
 }
 
+speedtest_global_iperf3() {
+  if ! command -v iperf3 >/dev/null 2>&1; then
+    case "$system" in
+      1) apt install -y iperf3 ;;
+      2) yum install -y iperf3 ;;
+    esac
+  fi
+
+  local RESULT_DIR="$HOME/result"
+  local output_file="${RESULT_DIR}/global_net.txt"
+
+  mkdir -p "$RESULT_DIR"
+
+  case "$lang" in
+    cn)
+      local t_running="正在执行全球网络测速 (iperf3 模式)..."
+      local t_report_title_md="## 全球网络速度测试报告"
+      local t_location="地区"
+      local t_upload="上传速度"
+      local t_download="下载速度"
+      local t_failed="测试失败"
+      ;;
+    en)
+      local t_running="Running global network speed test (iperf3 mode)..."
+      local t_report_title_md="## Global Network Speed Test Report"
+      local t_location="Region"
+      local t_upload="Upload Speed"
+      local t_download="Download Speed"
+      local t_failed="Test failed"
+      ;;
+    *)
+      local t_running="正在執行全球網路測速 (iperf3 模式)..."
+      local t_report_title_md="## 全球網路速度測試報告"
+      local t_location="地區"
+      local t_upload="上傳速度"
+      local t_download="下載速度"
+      local t_failed="測試失敗"
+      ;;
+  esac
+
+  echo "$t_running"
+
+  local servers=(
+    "Los Angeles, US;speedtest.lax12.us.leaseweb.net;5201-5210"
+    "New York City, US;speedtest.nyc1.us.leaseweb.net;5201-5210"
+    "Montreal, Canada;speedtest.mtl2.ca.leaseweb.net;5201-5210"
+    "Frankfurt, DE;speedtest.fra1.de.leaseweb.net;5201-5210"
+    "Tokyo, JP;speedtest.tyo11.jp.leaseweb.net;5201-5210"
+    "Singapore, SG;speedtest.sin1.sg.leaseweb.net;5201-5210"
+    "Sydney, Australia;speedtest.syd12.au.leaseweb.net;5201-5210"
+  )
+
+  local unsorted_results=()
+
+  format_speed() {
+    local bps=$1
+    if ! [[ "$bps" =~ ^[0-9]+(\.[0-9]+)?$ ]] || [[ "$bps" == "null" ]]; then
+      echo "$t_failed"
+    elif (( $(echo "$bps > 1000000000" | bc -l) )); then
+      printf "%.2f Gbits/s" "$(echo "$bps / 1000000000" | bc -l)"
+    else
+      printf "%.2f Mbits/s" "$(echo "$bps / 1000000" | bc -l)"
+    fi
+  }
+
+  for server_info in "${servers[@]}"; do
+    local location=$(echo "$server_info" | cut -d';' -f1)
+    local server_host=$(echo "$server_info" | cut -d';' -f2)
+    local port_range=$(echo "$server_info" | cut -d';' -f3)
+    local start_port=$(echo "$port_range" | cut -d'-' -f1)
+    local end_port=$(echo "$port_range" | cut -d'-' -f2)
+
+    run_iperf_test() {
+      local direction_flag=$1
+      local last_json_output=""
+      local ports=($(shuf -i "$start_port"-"$end_port" -n 10))
+
+      for port in "${ports[@]}"; do
+        local json_output=$(iperf3 -c "$server_host" -p "$port" -P 8 -t 5 $direction_flag --json 2>/dev/null)
+        last_json_output="$json_output"
+
+        if echo "$json_output" | jq -e '.end.sum_sent.bits_per_second' >/dev/null 2>&1; then
+          echo "$json_output"
+          return
+        fi
+
+        local error_msg=$(echo "$json_output" | jq -r '.error // empty')
+      done
+      echo "$last_json_output"
+    }
+
+    local json_upload=$(run_iperf_test "")
+    local json_download=$(run_iperf_test "-R")
+
+    local bps_upload=$(echo "$json_upload" | jq '.end.sum_sent.bits_per_second // 0')
+    local bps_download=$(echo "$json_download" | jq '.end.sum_received.bits_per_second // 0')
+
+    local upload_str=$(format_speed "$bps_upload")
+    local download_str=$(format_speed "$bps_download")
+
+    if [[ "$upload_str" == "$t_failed" ]]; then
+      {
+        echo "--- FAILED UPLOAD: $location ---"
+        echo "$json_upload"
+        echo "--- END ---"
+      } >> "$debug_log_file"
+    fi
+    if [[ "$download_str" == "$t_failed" ]]; then
+      {
+        echo "--- FAILED DOWNLOAD: $location ---"
+        echo "$json_download"
+        echo "--- END ---"
+      } >> "$debug_log_file"
+    fi
+
+    [[ ! "$bps_upload" =~ ^[0-9] ]] && bps_upload=0
+    unsorted_results+=("$bps_upload|$location|$upload_str|$download_str")
+  done
+
+  local sorted_output=$(printf "%s\n" "${unsorted_results[@]}" | sort -t'|' -k1,1nr)
+
+  echo -e "\n$t_location\t$t_upload\t$t_download"
+  echo "---------------------------------------------"
+
+  local file_report="$t_report_title_md\n\n| $t_location | $t_upload | $t_download |\n|:---|:---|:---|\n"
+
+  while IFS='|' read -r _ location upload_str download_str; do
+    printf "%-20s %-15s %-15s\n" "$location" "$upload_str" "$download_str"
+    file_report+="| $location | $upload_str | $download_str |\n"
+  done <<< "$sorted_output"
+
+  echo -e "\n$file_report" > "$output_file"
+}
+
 speedtest_global() {
   if [[ "$ip" == "v6" ]]; then
     return 0
@@ -1248,6 +1382,15 @@ speedtest_global() {
       local t_report="## 全球網路速度測試報告 (前10名與後3名)"
       ;;
   esac
+  echo -e "${YELLOW}警告！此測速腳本會消耗大約200-400GB的流量，請先查閱您的vps TOS協議再來動作${RESET}"
+  echo -e "${YELLOW}Warning! This speed test script will consume approximately 200-400GB of bandwidth. Please check your VPS TOS agreement before proceeding.${RESET}"
+  read -p "您確定要繼續執行高流量測試嗎？(Are you sure you want to proceed?) [y/N]: " confirm
+  confirm=${confirm:-n}
+  confirm=${confirm,,}
+  if [[ ! "$confirm" =~ ^(y|yes)$ ]]; then
+    speedtest_global_iperf3
+    return $?
+  fi
 
   echo "$t_running"
   alias curl='if echo "$@" | grep -q "result.nws.sh"; then echo "https://result.nws.sh/local-only"; else command curl "$@"; fi'
@@ -1553,6 +1696,10 @@ while [[ $# -gt 0 ]]; do
       [[ $2 == cn ]] && lang=cn
       [[ $2 == en ]] && lang=us
       shift 2
+      ;;
+    -sgb)
+      gb=false
+      shift
       ;;
     -hw)
       do_hw=true
