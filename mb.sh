@@ -35,7 +35,7 @@ YELLOW='\033[1;33m'  # ⚠️ 警告用黃色
 CYAN="\033[1;36m"    # ℹ️ 一般提示用青色
 RESET='\033[0m'      # 清除顏色
 
-version="v2025.11.04"
+version="v2025.11.06"
 
 handle_error() {
     local exit_code=$?
@@ -738,8 +738,7 @@ cpu_oversell_test() {
   # --- 第二部分：壓力分析 ---
   echo -e "\n$t_stress_start"
   local stress_threads=$((cpu_count * 8))
-  [ $stress_threads -lt 8 ] && stress_threads=8
-  [ $stress_threads -gt 32 ] && stress_threads=32
+  [ $stress_threads -gt 128 ] && stress_threads=128
   printf "$t_stress_params\n" "$stress_threads"
   
   local stress_raw_output=$(cyclictest -t $stress_threads -p80 -i500 -d10 -l10000 -m 2>/dev/null | grep '^T:' | tail -n "$stress_threads")
