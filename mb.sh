@@ -35,7 +35,7 @@ YELLOW='\033[1;33m'  # ⚠️ 警告用黃色
 CYAN="\033[1;36m"    # ℹ️ 一般提示用青色
 RESET='\033[0m'      # 清除顏色
 
-version="v2025.11.06"
+version="v2025.11.05"
 
 handle_error() {
     local exit_code=$?
@@ -68,7 +68,7 @@ handle_error() {
 }
 
 log_session_start() {
-    echo "============================================================" >> "$LOG_FILE"
+    echo "============================================================" > "$LOG_FILE"
     echo "[$(date '+%Y-%m-%d %H:%M:%S')] MatrixBench session started." >> "$LOG_FILE"
     # 記錄下傳遞給腳本的所有參數
     echo "[$(date '+%Y-%m-%d %H:%M:%S')] User parameters: $@" >> "$LOG_FILE"
@@ -670,6 +670,7 @@ cpu_oversell_test() {
     local t_stress_conclusion_abnormal="壓力結論：性能反常。高壓下的延遲峰值反常地低於標準延遲，可能存在QoS限制或其他性能調度問題。"
     ;;
   esac
+  sleep 30
   local cpu_usage=$(mpstat 1 1 | awk '/Average/ {print 100 - $12}')
   if [ -n "$cpu_usage" ] && (( $(echo "$cpu_usage > 10" | bc -l) )); then
     printf "${YELLOW}"
@@ -696,7 +697,12 @@ cpu_oversell_test() {
     sleep 0.5 # 確保 sar 啟動
 
     # --- 執行 cyclictest ---
-    local raw_output=$(cyclictest --smp -p80 -i500 -d10 -l10000 -m 2>/dev/null | grep '^T:' | tail -n "$cpu_count")
+    if [ "$cpu_count" -eq 1 ]; then
+      cpu_co=$cpu_count
+    else
+      cpu_co=$(echo "$cpu_count - 1" | bc)
+    fi
+    local raw_output=$(cyclictest -t $cpu_co -p80 -i500 -d10 -l10000 -m 2>/dev/null | grep '^T:' | tail -n "$cpu_co")
 
     # --- 停止監控並等待 ---
     kill $monitor_pid 2>/dev/null
@@ -889,7 +895,7 @@ ip_quality() {
   <\/style>' "$TEMP_HTML"
   
   $chromium_comm --headless --no-sandbox --disable-gpu \
-    --screenshot=$FINAL_IMAGE_FILE\
+    --screenshot=$FINAL_IMAGE_FILE \
     --window-size=2000,10000 \
     file://$TEMP_HTML >/dev/null 2>&1
   mogrify -trim $FINAL_IMAGE_FILE
@@ -1302,7 +1308,7 @@ speedtest_global_iperf3() {
       local ports=($(shuf -i "$start_port"-"$end_port" -n 10))
 
       for port in "${ports[@]}"; do
-        local json_output=$(iperf3 -c "$server_host" -p "$port" -P 8 -t 5 $direction_flag --json 2>/dev/null)
+        local json_output=$(timeout 60 iperf3 -c "$server_host" -p "$port" -P 8 -t 5 $direction_flag --json 2>/dev/null)
         last_json_output="$json_output"
 
         if echo "$json_output" | jq -e '.end.sum_sent.bits_per_second' >/dev/null 2>&1; then
@@ -1311,6 +1317,12 @@ speedtest_global_iperf3() {
         fi
 
         local error_msg=$(echo "$json_output" | jq -r '.error // empty')
+
+        # 🚫 若出現 interrupt - the client has terminated，直接放棄此節點
+        if [[ "$error_msg" == *"interrupt - the client has terminated"* ]]; then
+          echo "$json_output"
+          return
+        fi
       done
       echo "$last_json_output"
     }
@@ -1323,21 +1335,6 @@ speedtest_global_iperf3() {
 
     local upload_str=$(format_speed "$bps_upload")
     local download_str=$(format_speed "$bps_download")
-
-    if [[ "$upload_str" == "$t_failed" ]]; then
-      {
-        echo "--- FAILED UPLOAD: $location ---"
-        echo "$json_upload"
-        echo "--- END ---"
-      } >> "$debug_log_file"
-    fi
-    if [[ "$download_str" == "$t_failed" ]]; then
-      {
-        echo "--- FAILED DOWNLOAD: $location ---"
-        echo "$json_download"
-        echo "--- END ---"
-      } >> "$debug_log_file"
-    fi
 
     [[ ! "$bps_upload" =~ ^[0-9] ]] && bps_upload=0
     unsorted_results+=("$bps_upload|$location|$upload_str|$download_str")
