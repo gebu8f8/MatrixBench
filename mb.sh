@@ -35,7 +35,7 @@ YELLOW='\033[1;33m'  # ⚠️ 警告用黃色
 CYAN="\033[1;36m"    # ℹ️ 一般提示用青色
 RESET='\033[0m'      # 清除顏色
 
-version="v2025.11.05"
+version="v2025.11.13"
 
 handle_error() {
     local exit_code=$?
@@ -310,7 +310,7 @@ ecs_simple_static() (
   
   script -qfc "$EXECUTABLE_PATH -l $lang_param -menu=false -log=false \
     -basic=true -cpu=false -memory=false -disk=false \
-    -comm=false -email=false -nt3=false -security=false \
+    -email=false -nt3=false -security=false \
     -speed=false -upload=false -ut=false -backtrace=false" \
     /dev/null 2>/dev/null | tee "$TEMP_OUTPUT"
 
@@ -359,7 +359,7 @@ hardware_benchmarks() (
   # --- 步驟 2: 執行 goecs 並捕獲輸出 ---
   echo "$hardware_benchmarks_2"
   cd $TEMP_WORKDIR
-  local goecs_output=$("$EXECUTABLE_PATH" -l en -log=false -menu=false -cpu=true -memory=true -disk=true -basic=false -comm=false -email=false -nt3=false -security=false -speed=false -upload=false -ut=false -backtrace=false -memorym sysbench)
+  local goecs_output=$("$EXECUTABLE_PATH" -l en -log=false -menu=false -cpu=true -memory=true -disk=true -basic=false -email=false -nt3=false -security=false -speed=false -upload=false -ut=false -backtrace=false -memorym sysbench)
   echo "$goecs_output"
 
   # --- 步驟 3: 執行 yabs.sh 並捕獲輸出 ---
