@@ -41,7 +41,9 @@ T:15 (416475) P:80 I:650 C:   7741 Min:      8 Act:   25 Avg:   91 Max:   11230
 ```
 
 Steal Time (竊取時間) 峰值: 22.78%
+
 最大內核延遲 (Max Latency): 18225 12179 µs
+
 壓力測試峰值延遲 (Stress Peak): 11581 µs
 
 ---
@@ -114,7 +116,9 @@ T:31 (352745) P:80 I:810 C:   6188 Min:      5 Act:    8 Avg:   17 Max:    2570
 ```
 
 Steal Time (竊取時間) 峰值: 0.25%
+
 最大內核延遲 (Max Latency): 2997 676 µs
+
 壓力測試峰值延遲 (Stress Peak): 3293 µs
 
 ---
