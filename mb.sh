@@ -35,7 +35,7 @@ YELLOW='\033[1;33m'  # ⚠️ 警告用黃色
 CYAN="\033[1;36m"    # ℹ️ 一般提示用青色
 RESET='\033[0m'      # 清除顏色
 
-version="v2025.11.13"
+version="v2025.12.14"
 
 handle_error() {
     local exit_code=$?
@@ -184,13 +184,6 @@ check_app(){
       yum install -y epel-release
     fi
   fi
-  if [ "$system" -eq 1 ]; then
-    # 檢查 apt 列表是否在最近一小時內更新過，如果沒有，才執行更新
-    if [ -z "$(find /var/lib/apt/lists -maxdepth 1 -mmin -60)" ]; then
-      apt update
-    fi
-  fi
-
   # 逐一檢查並安裝
   for cmd in "${!pkg_map[@]}"; do
     if ! command -v "$cmd" >/dev/null 2>&1; then
@@ -333,7 +326,7 @@ ecs_simple_static() (
   $chromium_comm --headless --no-sandbox --disable-gpu \
     --screenshot=$FINAL_IMAGE_FILE\
     --window-size=1000,1000 \
-    file://$TEMP_HTML
+    file://$TEMP_HTML >/dev/null 2>&1
   mogrify -trim $FINAL_IMAGE_FILE
 )
 
@@ -830,7 +823,7 @@ ip_quality() {
   # --- 設定 ---
   local RESULT_DIR="$HOME/result"
   local OFFICIAL_ANSI_OUTPUT="$TEMP_WORKDIR/ip.ansi"
-  local TEMP_HTML="$TEMP_WORKDIR/temp_report.html"
+  local TEMP_SVG="$TEMP_WORKDIR/temp_report.svg"
   local FINAL_IMAGE_FILE="${RESULT_DIR}/IP.png"
 
   echo -e "${CYAN}$ip_quality_1...${RESET}"
@@ -846,58 +839,13 @@ ip_quality() {
   cat $OFFICIAL_ANSI_OUTPUT
   
   sed -i 's/\r//g; /^$/d' "$OFFICIAL_ANSI_OUTPUT"
-
-  aha --title "$ip_quality_2" < "$OFFICIAL_ANSI_OUTPUT" > "$TEMP_HTML"
-  
-  sed -i '/<head>/a \
-  <style type="text/css"> \
-    body { \
-      background-color: #181a1f !important; \
-      font-family: "Noto Sans CJK SC", "Noto Sans CJK TC", "Noto Sans", "Noto Sans Mono", "Noto Color Emoji", "DejaVu Sans Mono", "Courier New", monospace; \
-      padding: 25px; \
-      color: #cfcfcf; \
-    } \
-    pre { \
-      color: #cfcfcf; \
-      white-space: pre-wrap; \
-      word-wrap: break-word; \
-      font-size: 14px; \
-      line-height: 1.45; \
-      letter-spacing: 0.2px; \
-    } \
-    \
-    span[style*="color:red"] { color: #ff5555 !important; text-shadow: none !important; } \
-    span[style*="color:green"] { color: #586e44 !important; text-shadow: none !important; } \
-    span[style*="color:green"][style*="font-weight:bold"] { color: #93d367 !important; text-shadow: 0 0 3px #003d00 !important; } \
-    span[style*="color:yellow"] { color: #f1fa8c !important; text-shadow: 0 0 3px #7a751e; } \
-    span[style*="color:blue"] { color: #61afef !important; text-shadow: 0 0 3px #234a7a; } \
-    span[style*="color:cyan"] { color: #8be9fd !important; text-shadow: 0 0 3px #236b7a; } \
-    span[style*="color:magenta"], span[style*="color:purple"] { color: #bd93f9 !important; text-shadow: 0 0 3px #4a2a7a; } \
-    span[style*="color:gray"], span[style*="color:dimgray"] { color: #9e9e9e !important; } \
-    span[style*="color:white"] { color: #e6e6e6 !important; } \
-    span[style*="color:olive"]{ color: #f1fa8c !important; } \
-    span[style*="color:teal"] { color: #3d5557 !important; } \
-    \
-    span[style*="background-color:red"] { background-color: #bc0013 !important; color: #fff !important; } \
-    span[style*="background-color:green"] { background-color: #45a815 !important; color: #ffffff !important; } \
-    span[style*="background-color:blue"] { background-color: #003366 !important; color: #fff !important; } \
-    span[style*="background-color:cyan"] { background-color: #004b4b !important; color: #fff !important; } \
-    span[style*="background-color:yellow"] { background-color: #7a6e00 !important; color: #fff !important; } \
-    span[style*="background-color:purple"], span[style*="background-color:magenta"] { background-color: #4b006e !important; color: #fff !important; } \
-    span[style*="background-color:olive"] { background-color: #e8751d !important; color: #ffffff !important; } \
-    span[style*="background-color:green"][style*="font-weight:bold"] { color: #ffffff !important; } \
-    \
-    span[style*="text-decoration:underline"] { \
-      text-decoration-thickness: 2px !important; \
-      text-underline-offset: 2px !important; \
-      text-decoration-color: currentColor !important; \
-    } \
-  <\/style>' "$TEMP_HTML"
-  
+  wget -qO $TEMP_WORKDIR/ansi https://files.gebu8f.com/files/ansi
+  chmod +x $TEMP_WORKDIR/ansi 
+  $TEMP_WORKDIR/ansi $OFFICIAL_ANSI_OUTPUT $TEMP_SVG >/dev/null
   $chromium_comm --headless --no-sandbox --disable-gpu \
     --screenshot=$FINAL_IMAGE_FILE \
     --window-size=2000,10000 \
-    file://$TEMP_HTML >/dev/null 2>&1
+    file://$TEMP_SVG >/dev/null 2>&1
   mogrify -trim $FINAL_IMAGE_FILE
 }
 
@@ -1753,12 +1701,12 @@ if $run_all || $do_hw || $do_ip || $do_nq || $do_nr || $do_stream; then
   case $system in
   1)
     if ! command -v chromium >/dev/null 2>&1; then
-      apt install -y chromium || snap install chromium
+      apt update && apt install -y chromium || snap install chromium
     fi
     ;;
   2)
     if ! command -v chromium-browser >/dev/null 2>&1; then
-      yum install -y chromium
+      dnf update && dnf install -y chromium
     fi
     ;;
   esac
