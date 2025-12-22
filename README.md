@@ -21,7 +21,7 @@ Run the command below to perform a full system benchmark. Dependencies will be i
 ```bash
 bash <(curl -sL https://mb.gebu8f.com) -l en
 ```
-> **Note:** The first run may take some time as the script installs necessary tools like `curl`, `jq`, and `wkhtmltoimage`. An IPv4 connection is required for all tests to run correctly.
+> **Note:** The first run may take some time as the script installs necessary tools like `curl`, `jq`, and `chromium`. An IPv4 connection is required for all tests to run correctly.
 ## Options and parameters
 By default, MatrixBench performs a comprehensive analysis. Use the following options to run specific tests and save time.
 
