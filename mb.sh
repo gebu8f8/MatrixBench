@@ -35,7 +35,7 @@ YELLOW='\033[1;33m'  # ⚠️ 警告用黃色
 CYAN="\033[1;36m"    # ℹ️ 一般提示用青色
 RESET='\033[0m'      # 清除顏色
 
-version="v2025.12.14"
+version="v2026.01.03"
 
 handle_error() {
     local exit_code=$?
@@ -157,6 +157,7 @@ check_system(){
 }
 
 check_app(){
+  local is_app_install=false
   # 根據系統選擇 script 對應套件
   if [ "$system" -eq 1 ]; then
     pkg_script="bsdutils"
@@ -178,10 +179,22 @@ check_app(){
     ["cyclictest"]="rt-tests"
     ["sysbench"]="sysbench"
     ["convert"]="imagemagick"
+    ["ioping"]="ioping"
   )
   if [ $system == 2 ]; then
     if ! yum repolist enabled | grep -q "epel"; then
       yum install -y epel-release
+    fi
+  fi
+  for cmd in "${!pkg_map[@]}"; do
+    if ! command -v "$cmd" >/dev/null 2>&1; then
+      is_app_install=true
+    fi
+  done
+  if $is_app_install; then
+    if ! curl -s --connect-timeout 3 https://api64.ipify.org >/dev/null; then
+      echo -e "${RED}您的網路不通，請稍後再試（Your network is down, please try again later）${RESET}"
+      exit 1
     fi
   fi
   # 逐一檢查並安裝
@@ -221,10 +234,11 @@ check_app(){
 }
 
 ecs_download() {
-  # 使用 curl 呼叫 API，並透過 jq 解析 JSON 以取得 tag_name
   if [ -f $TEMP_WORKDIR/goces ]; then
     return
   fi
+  local LATEST_TAG
+  LATEST_TAG=$(curl -s "https://api.github.com/repos/oneclickvirt/ecs/releases/latest" | jq -r '.tag_name')
 
   # 3. 偵測系統指令集 (x86_64 -> amd64, aarch64 -> arm64)
   local SYS_ARCH
@@ -253,7 +267,7 @@ ecs_download() {
 
   # 4. 組合下載 URL 並選擇下載
   local FILENAME="goecs_linux_${DL_ARCH}.zip"
-  local DOWNLOAD_URL="https://files.gebu8f.com/files/${FILENAME}"
+  local DOWNLOAD_URL="https://github.com/oneclickvirt/ecs/releases/download/${LATEST_TAG}/${FILENAME}"
   local ZIPPED_FILE_PATH="${TEMP_WORKDIR}/${FILENAME}"
 
   # 執行下載
@@ -265,6 +279,7 @@ ecs_download() {
   # 6. 刪除壓縮檔
   rm "$ZIPPED_FILE_PATH"
 }
+
 ecs_simple_static() (
   local EXECUTABLE_PATH="$TEMP_WORKDIR/goecs"
   local RESULT_DIR="$HOME/result"
@@ -336,8 +351,7 @@ hardware_benchmarks() (
   local EXECUTABLE_PATH="${ECS_DIR}/goecs"
   local RESULT_DIR="$HOME/result"
   local RESULT_FILE="${RESULT_DIR}/hardware.txt"
-  local cpu_count
-  cpu_count=$(nproc)
+  local cpu_count=$(nproc)
 
 
   # --- 步驟 1: 檢查 goecs 執行檔 ---
@@ -595,7 +609,7 @@ cpu_oversell_test() {
   local report="$HOME/result/hardware.txt"
   mkdir -p "$(dirname "$report")"
 
-  # --- 多語言文本定義 (整合版) ---
+  # --- 多語言文本定義 (最終修復版：使用 %b 顯示顏色) ---
   case "$lang" in
   cn)
     local t_warm="系统非空闲 (当前CPU总使用率: %.0f%%)，测试结果可能不准。"
@@ -607,8 +621,11 @@ cpu_oversell_test() {
     local t_stress_start="${CYAN}静态分析完成，开始执行压力测试...${RESET}"
     local t_analysis="--- 最终分析结论 ---"
     local t_st_report="Steal Time (窃取时间) 峰值: %.2f%%"
+    local t_st_count_report="Steal Time (窃取时间) 非零次数: %d/%d (%.0f%%)"
     local t_lat_report="标准测试最大延迟 (Std Latency): %s µs"
+    local t_jitter_report="标准测试抖动范围 (Std Jitter) : %s µs"
     local t_stress_report="压力测试峰值延迟 (Stress Peak): %d µs"
+    local t_grade_report="综合性能评级 (Score): %b" # 使用 %b 解析颜色代码
     local t_conclusion_st_fail="分析：检测到显著的 CPU Steal Time (>2.0%)。这表明 Hypervisor (底层母机) 无法稳定分配所承诺的 CPU 时间，性能会受到不可预测的严重影响。不适用于任何对稳定性有要求的生产环境。"
     local t_conclusion_lat_exc="分析：内核延迟极低且稳定 (平均 < 1500µs)。性能表现极其稳定，接近实体机水平，CPU 资源几乎无干扰。非常适用于延迟敏感型应用 (如游戏服务器、即时通讯)。"
     local t_conclusion_lat_good="分析：内核延迟存在轻微波动 (平均 1500µs - 4000µs)。这是典型且健康的共享虚拟化环境。CPU 资源与其他用户共享，存在轻度邻居干扰，适用于网站、博客等通用型应用。"
@@ -628,15 +645,17 @@ cpu_oversell_test() {
     local t_post_rest="${CYAN}First run complete, cooling down for 30 seconds...${RESET}"
     local t_analysis="--- Final Analysis Conclusion ---"
     local t_st_report="Peak Steal Time: %.2f%%"
+    local t_st_count_report="Non-zero Steal Time Count: %d/%d (%.0f%%)"
     local t_lat_report="Max Kernel Latency: %s µs"
+    local t_jitter_report="Std Jitter Range: %s µs"
     local t_stress_report="Stress Peak: %d µs"
+    local t_grade_report="Overall Score: %b"
     local t_conclusion_st_fail="Analysis: Significant CPU Steal Time (>2.0%) was detected. This indicates the Hypervisor is failing to provide the guaranteed CPU time, leading to unpredictable and severe performance degradation. Not suitable for any production environment that requires stability."
     local t_conclusion_lat_exc="Analysis: Kernel latency is extremely low and stable (average < 1500µs). This indicates near-bare-metal performance with minimal CPU resource interference. Ideal for latency-sensitive applications like game servers or real-time communication."
     local t_conclusion_lat_good="Analysis: Minor fluctuations in kernel latency were observed (average 1500µs - 4000µs). This is typical of a healthy, shared virtualization environment. Suitable for general-purpose applications like websites and blogs."
     local t_conclusion_lat_bad="Analysis: Severe jitter in kernel latency was detected (average > 4000µs). This suggests significant CPU resource contention and poor performance consistency. Only suitable for offline tasks or scenarios with very low stability requirements."
     local t_stress_conclusion_low_impact=" Stress Conclusion: Excellent performance. The peak latency under high pressure increases within a manageable range compared to the standard latency."
     local t_stress_conclusion_high_impact="Stress Conclusion: Stable performance. The peak latency under high pressure increases significantly compared to the standard latency, but remains within control."
-
     local t_stress_conclusion_bottleneck="Stress Conclusion: Performance bottleneck. The peak latency under high pressure increases exponentially compared to the standard latency, reaching a performance bottleneck."
     local t_stress_params="[Stress Parameters: %d concurrent threads]"
     local t_stress_conclusion_abnormal="Stress Conclusion: Abnormal Performance. Peak latency under high load is abnormally lower than standard latency, suggesting potential QoS throttling or other performance scheduling issues."
@@ -650,8 +669,11 @@ cpu_oversell_test() {
     local t_post_rest="${CYAN}第一次測試完成，30 秒冷卻中...${RESET}"
     local t_analysis="--- 最終分析結論 ---"
     local t_st_report="Steal Time (竊取時間) 峰值: %.2f%%"
+    local t_st_count_report="Steal Time (竊取時間) 非零次數: %d/%d (%.0f%%)"
     local t_lat_report="最大內核延遲 (Max Latency): %s µs"
+    local t_jitter_report="標準測試抖動範圍 (Std Jitter): %s µs"
     local t_stress_report="壓力測試峰值延遲 (Stress Peak): %d µs"
+    local t_grade_report="綜合性能評級 (Score): %b"
     local t_conclusion_st_fail="分析：檢測到顯著的 CPU Steal Time (>2.0%)。這表明 Hypervisor (底層母機) 無法穩定分配所承諾的 CPU 時間，性能會受到不可預測的嚴重影響。不適用於任何對穩定性有要求的生產環境。"
     local t_conclusion_lat_exc="結論：分析：內核延遲極低且穩定 (平均 < 1500µs)。性能表現極其穩定，接近實體機水平，CPU 資源幾乎無干擾。非常適用於延遲敏感型應用 (如遊戲伺服器、即時通訊)。"
     local t_conclusion_lat_good="分析：內核延遲存在輕微波動 (平均 1500µs - 4000µs)。這是典型且健康的共享虛擬化環境。CPU 資源與其他用戶共享，存在輕度鄰居干擾，適用於網站、部落格等通用型應用。"
@@ -675,19 +697,22 @@ cpu_oversell_test() {
   echo "$t_params"
 
   local peak_st_value=0.0
+  local peak_nonzero_count=0
+  local peak_total_samples=0
   local all_poetic_outputs=""
   local cpu_count=$(nproc)
   local -a max_latencies=()
+  local -a jitters=()
   local test_rounds=2
 
   # --- 第一部分：標準靜態分析 ---
   for (( i=1; i<=test_rounds; i++ )); do
     printf "\n$t_test_run\n" "$i"
 
-    # --- 同步啟動 sar 監控 ---
+    # --- 同步啟動 sar ---
     LC_ALL=C sar -u 1 15 > "$TEMP_WORKDIR/sar_out.txt" 2>/dev/null &
     local monitor_pid=$!
-    sleep 0.5 # 確保 sar 啟動
+    sleep 0.5
 
     # --- 執行 cyclictest ---
     if [ "$cpu_count" -eq 1 ]; then
@@ -697,31 +722,60 @@ cpu_oversell_test() {
     fi
     local raw_output=$(cyclictest -t $cpu_co -p80 -i500 -d10 -l10000 -m 2>/dev/null | grep '^T:' | tail -n "$cpu_co")
 
-    # --- 停止監控並等待 ---
+    # --- 停止監控 ---
     kill $monitor_pid 2>/dev/null
-    wait $monitor_pid 2>/dev/null
+    wait $monitor_pid 2>/dev/null || true
 
     # --- 格式化 cyclictest 輸出 ---
     local poetic_output=$(echo "$raw_output" | awk '{
       min=""; avg=""; max="";
-      for(i=1; i<=NF; i++) { if($i == "Min:") min=$(i+1); if($i == "Avg:") avg=$(i+1); if($i == "Max:") max=$(i+1); }
-      printf "T%-2s Min: %-5s Avg: %-5s Max: %-5s\n", $2, min, avg, max
+      for(i=1; i<=NF; i++) { 
+        if($i == "Min:") min=$(i+1); 
+        if($i == "Avg:") avg=$(i+1); 
+        if($i == "Max:") max=$(i+1); 
+      }
+      jitter = (max - min);
+      printf "T%-2s Min: %-5s Avg: %-5s Max: %-5s Jitter: %-5s\n", $2, min, avg, max, jitter
     }')
     echo "$poetic_output"
     all_poetic_outputs+="[Round $i]\n$poetic_output\n"
 
-    # --- 提取並記錄本輪最大延遲 ---
+    # --- 提取數據 ---
     local run_max_latency=$(echo "$raw_output" | awk -F'Max: ' '{print $2}' | awk '{print $1}' | sort -rn | head -n1)
-    max_latencies+=( "${run_max_latency:-0}" )
+    local run_max_jitter=$(echo "$raw_output" | awk '{
+       min=""; max="";
+       for(i=1; i<=NF; i++) { if($i == "Min:") min=$(i+1); if($i == "Max:") max=$(i+1); }
+       print (max - min)
+    }' | sort -rn | head -n1)
 
-    # --- 提取並更新 st 峰值 ---
-    local current_max_st=$(awk 'NR>2 && $1!="Average:" && $(NF-1) ~ /^[0-9.]+$/ { steal = $(NF-1); if(steal > max) max = steal } END {print max+0}' "$TEMP_WORKDIR/sar_out.txt")
+    max_latencies+=( "${run_max_latency:-0}" )
+    jitters+=( "${run_max_jitter:-0}" )
+
+    # --- 分析 sar ---
+    local sar_stats=$(awk '
+      NR>3 && $1!="Average:" && NF>3 { 
+        total++;
+        steal = $(NF-1);
+        if (steal > 0) count++;
+        if (steal > max) max = steal;
+      } 
+      END { print (max+0) " " (count+0) " " (total+0) }
+    ' "$TEMP_WORKDIR/sar_out.txt")
     rm -f "$TEMP_WORKDIR/sar_out.txt"
+
+    read current_max_st current_nonzero_count current_total_samples <<< "$sar_stats"
+
     if (( $(echo "$current_max_st > $peak_st_value" | bc -l) )); then
       peak_st_value=$current_max_st
     fi
 
-    # --- 首輪測試後休息 ---
+    if [ "$current_nonzero_count" -gt "$peak_nonzero_count" ]; then
+      peak_nonzero_count=$current_nonzero_count
+      peak_total_samples=$current_total_samples
+    elif [ "$peak_total_samples" -eq 0 ]; then
+      peak_total_samples=$current_total_samples
+    fi
+
     if [ $i -lt $test_rounds ]; then
       echo -e "$t_post_rest"
       sleep 30
@@ -729,6 +783,7 @@ cpu_oversell_test() {
   done
   
   local latencies_str=$(printf '%s ' "${max_latencies[@]}"; echo)
+  local jitters_str=$(printf '%s ' "${jitters[@]}"; echo)
   local avg_latency=0
   local sum=0
   for val in "${max_latencies[@]}"; do sum=$((sum + val)); done
@@ -744,51 +799,33 @@ cpu_oversell_test() {
   echo "$stress_raw_output"
   local stress_peak_latency=$(echo "$stress_raw_output" | awk -F'Max: ' '{print $2}' | awk '{print $1}' | sort -rn | head -n1)
   stress_peak_latency=${stress_peak_latency:-0}
-  
   all_poetic_outputs+="\n[Stress Test - ${stress_threads} Threads]\n$stress_raw_output\n"
 
   # --- 第三部分：最終綜合分析 ---
   echo -e "\n--------------------------"
   echo "$t_analysis"
   
-  # 1. 報告 st 和延遲數據
+  [ -z "$peak_total_samples" ] || [ "$peak_total_samples" -eq 0 ] && peak_total_samples=1
+  local st_percent=0
+  st_percent=$(echo "$peak_nonzero_count * 100 / $peak_total_samples" | bc -l)
+
   printf "$t_st_report\n" "$peak_st_value"
+  printf "$t_st_count_report\n" "$peak_nonzero_count" "$peak_total_samples" "$st_percent"
   printf "$t_lat_report\n" "${latencies_str% }"
+  printf "$t_jitter_report\n" "${jitters_str% }"
   printf "$t_stress_report\n" "$stress_peak_latency"
-  echo "---"
-
-  # 2. 生成「誠信度結論」(基於 st 和標準延遲)
-  local honesty_conclusion
-  if (( $(echo "$peak_st_value >= 2.0" | bc -l) )); then
-    honesty_conclusion="$t_conclusion_st_fail"
-  else
-    if [[ "$avg_latency" -le 1500 ]]; then
-      honesty_conclusion="$t_conclusion_lat_exc"
-    elif [[ "$avg_latency" -le 4000 ]]; then
-      honesty_conclusion="$t_conclusion_lat_good"
-    else
-      honesty_conclusion="$t_conclusion_lat_bad"
-    fi
-  fi
-  echo -e "$honesty_conclusion"
-
-  # 3. 生成「壓力結論」(基於壓力延遲與標準延遲的比較)
+  
+  # === 1. 先生成「壓力結論」 (因為評級依賴這個結果) ===
   local stress_conclusion
-
-  # --- [核心修改] ---
-  # 新的觸發邏輯：壓力測試的峰值延遲，必須同時小於兩輪靜態測試的最大延遲，才判定為「性能反常」
   if [[ ${#max_latencies[@]} -eq 2 ]] && \
      (( $(echo "$stress_peak_latency < ${max_latencies[0]}" | bc -l) )) && \
      (( $(echo "$stress_peak_latency < ${max_latencies[1]}" | bc -l) )); then
     stress_conclusion="$t_stress_conclusion_abnormal"
   else
-    # 如果不滿足反常條件，則沿用原有的比例比較邏輯，但基準改為 avg_latency
     local ratio=0
-    # 確保 avg_latency 大於 0 避免除零錯誤
     if (( $(echo "$avg_latency > 0" | bc -l) )); then
       ratio=$(echo "scale=2; $stress_peak_latency / $avg_latency" | bc)
     fi
-  
     if (( $(echo "$ratio <= 10.0" | bc -l) )); then
       stress_conclusion="$t_stress_conclusion_low_impact"
     elif (( $(echo "$ratio <= 30.0" | bc -l) )); then
@@ -797,26 +834,185 @@ cpu_oversell_test() {
       stress_conclusion="$t_stress_conclusion_bottleneck"
     fi
   fi
+
+  # === 2. 再進行評級 (Grade) ===
+  local grade="C"
+  local color_grade=""
+  local honesty_conclusion=""
+
+  if (( $(echo "$peak_st_value >= 2.0" | bc -l) )); then
+    grade="F (Steal Time High)"
+    color_grade="${RED}$grade${RESET}"
+    honesty_conclusion="$t_conclusion_st_fail"
+  else
+    if [[ "$avg_latency" -le 1500 ]]; then
+      # 基本延遲優秀，檢查壓力情況決定 S 或 A
+      if [[ "$stress_conclusion" == *"$t_stress_conclusion_low_impact"* ]]; then
+        grade="S (Excellent)"
+        color_grade="${GREEN}$grade${RESET}"
+      else
+        grade="A (Good)"
+        color_grade="${CYAN}$grade${RESET}"
+      fi
+      honesty_conclusion="$t_conclusion_lat_exc"
+    elif [[ "$avg_latency" -le 4000 ]]; then
+      grade="B (Average)"
+      color_grade="${YELLOW}$grade${RESET}"
+      honesty_conclusion="$t_conclusion_lat_good"
+    else
+      grade="C (Poor)"
+      color_grade="${RED}$grade${RESET}"
+      honesty_conclusion="$t_conclusion_lat_bad"
+    fi
+  fi
+  
+  # 輸出評級 (因為改用了 %b，所以顏色代碼會被正確解析)
+  printf "$t_grade_report\n" "$color_grade" 
+  echo "---"
+
+  # 輸出詳細結論
+  echo -e "$honesty_conclusion"
   echo -e "$stress_conclusion"
+
   # --- 寫入報告 ---
   {
     echo ""
     echo "$t_title"
     echo "$t_params"
     echo '```'
-    echo -e "$all_poetic_outputs" # 包含了标准测试和压力测试的所有原始输出
+    echo -e "$all_poetic_outputs"
     echo '```'
     echo ""
-    # --- 写入与终端完全一致的分析结论 ---
     printf "$t_st_report\n" "$peak_st_value"
+    printf "$t_st_count_report\n" "$peak_nonzero_count" "$peak_total_samples" "$st_percent"
     printf "$t_lat_report\n" "${latencies_str% }"
+    printf "$t_jitter_report\n" "${jitters_str% }"
     printf "$t_stress_report\n" "$stress_peak_latency"
+    printf "$t_grade_report\n" "$grade" 
     echo ""
     echo "---"
     echo ""
     echo -e "**$honesty_conclusion**"
     echo -e "**$stress_conclusion**"
   } >> "$report"
+}
+
+disk_test() {
+  local report="$HOME/result/hardware.txt"
+  
+  # --- 多語言定義 (維持不變) ---
+  case "$lang" in
+  cn)
+    local t_title="## 磁盘 I/O 稳定性测试"
+    local t_warm_disk="警告: 检测到硬盘繁忙 (当前最大利用率: %.1f%%)，测试结果可能受影响。"
+    local t_start="${CYAN}开始执行磁盘 I/O 稳定性测试 (参数: 60次请求, 约 60 秒)...${RESET}"
+    local t_raw_data="[原始数据] %s"
+    local t_result="I/O 平均延迟: %.1f us | 抖动 (mdev): %.1f us"
+    local t_grade="I/O 稳定性评级: %b"
+    ;;
+  us)
+    local t_title="## Disk I/O Stability Test"
+    local t_warm_disk="Warning: Disk is busy (Current Max Util: %.1f%%), results may be inaccurate."
+    local t_start="${CYAN}Starting Disk I/O Stability Test (Params: 60 reqs, approx. 60s)...${RESET}"
+    local t_raw_data="[Raw Data] %s"
+    local t_result="I/O Avg Latency: %.1f us | Jitter (mdev): %.1f us"
+    local t_grade="I/O Stability Score: %b"
+    ;;
+  *)
+    local t_title="## 磁盤 I/O 穩定性測試"
+    local t_warm_disk="警告: 檢測到硬碟繁忙 (當前最大利用率: %.1f%%)，測試結果可能受影響。"
+    local t_start="${CYAN}開始執行磁盤 I/O 穩定性測試 (參數: 60次請求, 約 60 秒)...${RESET}"
+    local t_raw_data="[原始數據] %s"
+    local t_result="I/O 平均延遲: %.1f us | 抖動 (mdev): %.1f us"
+    local t_grade="I/O 穩定性評級: %b"
+    ;;
+  esac
+
+  # --- 0. 檢測硬碟繁忙程度 ---
+  local disk_util=$(LC_ALL=C sar -d 1 1 | grep Average | grep -v DEV | awk '{print $NF}' | sort -rn | head -n1)
+  if [[ "$disk_util" =~ ^[0-9.]+$ ]]; then
+    if (( $(echo "$disk_util > 10.0" | bc -l) )); then
+      printf "${YELLOW}"
+      printf "$t_warm_disk" "$disk_util"
+      printf "${RESET}\n"
+      sleep 2
+    fi
+  fi
+
+  echo -e "\n$t_start"
+  # --- 2. 執行測試 (60次) ---
+  local raw_line=$(ioping -c 60 -q . 2>/dev/null | tail -n 1)
+  if [ -z "$raw_line" ]; then
+    raw_line="min/avg/max/mdev = 0 us / 0 us / 0 us / 0 us"
+  fi
+
+  local data_part=$(echo "$raw_line" | awk -F' = ' '{print $2}')
+  local clean_raw_data=$(echo "$data_part")
+
+  # --- 3. 數據提取與單位換算 (目標: us) ---
+  local avg_str=$(echo "$data_part" | awk -F' / ' '{print $2}')
+  local mdev_str=$(echo "$data_part" | awk -F' / ' '{print $4}')
+
+  convert_to_us() {
+    local val=$1
+    val=$(echo "$val" | xargs)
+    local num=$(echo "$val" | awk '{print $1}')
+    local unit=$(echo "$val" | awk '{print $2}')
+    if [ -z "$num" ]; then echo "0"; return; fi
+    if [[ "$unit" == "ms" ]]; then echo "scale=2; $num * 1000" | bc -l
+    elif [[ "$unit" == "s" ]]; then echo "scale=2; $num * 1000000" | bc -l
+    else echo "$num"; fi
+  }
+
+  local avg_us=$(convert_to_us "$avg_str")
+  local mdev_us=$(convert_to_us "$mdev_str")
+  
+  avg_us=${avg_us:-0}
+  mdev_us=${mdev_us:-0}
+
+  # --- 4. 評級邏輯 (S/A/B/C/D/F) ---
+  local grade="F"
+  local color_grade=""
+
+  if (( $(echo "$mdev_us <= 50" | bc -l) )); then
+    grade="S (Extremely Stable)"
+    color_grade="${GREEN}$grade${RESET}"
+  elif (( $(echo "$mdev_us <= 100" | bc -l) )); then
+    grade="A (Very Stable)"
+    color_grade="${CYAN}$grade${RESET}"
+  elif (( $(echo "$mdev_us <= 300" | bc -l) )); then
+    grade="B (Stable)"
+    color_grade="${YELLOW}$grade${RESET}"
+  elif (( $(echo "$mdev_us <= 500" | bc -l) )); then
+    grade="C (Average)"
+    color_grade="${YELLOW}$grade${RESET}"
+  elif (( $(echo "$mdev_us <= 1000" | bc -l) )); then
+    grade="D (Jittery)"
+    color_grade="${RED}$grade${RESET}"
+  else
+    grade="F (Unstable)"
+    color_grade="${RED}$grade${RESET}"
+  fi
+
+  # --- 5. 輸出與寫入報告 (使用最安全的變量+cat方式) ---
+  
+  # 終端顯示 (保持顏色)
+  printf "$t_raw_data\n" "$clean_raw_data"
+  printf "$t_result\n" "$avg_us" "$mdev_us"
+  printf "$t_grade\n" "$color_grade"
+
+  # 預先格式化要寫入文件的純文本字符串 (這一步能隔離錯誤)
+  local file_result=$(printf "$t_result" "$avg_us" "$mdev_us")
+  local file_grade=$(printf "$t_grade" "$grade")
+  cat <<EOF >> "$report"
+
+$t_title
+\`\`\`
+$raw_line
+\`\`\`
+$file_result
+$file_grade
+EOF
 }
 
 ip_quality() {
@@ -1144,19 +1340,19 @@ speedtest_data() {
       local t_region="地区"
       local t_download="下载速度"
       local t_upload="上传速度"
-      local t_local="(本地)"
+      local t_local="(最近的)"
       ;;
     us)
       local t_region="Region"
       local t_download="Download Speed"
       local t_upload="Upload Speed"
-      local t_local="(Local)"
+      local t_local="(Nearest)"
       ;;
     *)
       local t_region="地區"
       local t_download="下載速度"
       local t_upload="上傳速度"
-      local t_local="(本地)"
+      local t_local="(最近的)"
       ;;
   esac
 
@@ -1304,9 +1500,6 @@ speedtest_global_iperf3() {
 }
 
 speedtest_global() {
-  if [[ "$ip" == "v6" ]]; then
-    return 0
-  fi
   local RESULT_DIR="$HOME/result"
   local output_file="${RESULT_DIR}/global_net.txt"
   mkdir -p "$RESULT_DIR"
@@ -1337,9 +1530,21 @@ speedtest_global() {
   fi
 
   echo "$t_running"
-  alias curl='if echo "$@" | grep -q "result.nws.sh"; then echo "https://result.nws.sh/local-only"; else command curl "$@"; fi'
+  mkdir -p /tmp/fake_bin
+  cat << 'EOF' > /tmp/fake_bin/curl
+#!/bin/bash
+if echo "$@" | grep -q "result.nws.sh"; then
+    echo "https://result.nws.sh/local-only"
+else
+    /usr/bin/curl "$@"
+fi
+EOF
+  chmod +x /tmp/fake_bin/curl
+  export OLD_PATH="$PATH"
+  export PATH="/tmp/fake_bin:$PATH"
   local global_output=$(wget -qO- nws.sh | bash 2>/dev/null | sed 's/\x1b\[[0-9;]*m//g')
-  unalias curl
+  export PATH="$OLD_PATH"
+  rm -rf /tmp/fake_bin
   echo "$global_output"
 
   # 提取關鍵資訊以供後續使用
@@ -1575,13 +1780,16 @@ case $1 in
   exit 0
   ;;
 esac
-if curl -s --connect-timeout 3 https://api4.ipify.org >/dev/null; then
-  ipa=v4
-elif curl -s --connect-timeout 3 https://api6.ipify.org >/dev/null; then
-  ipa=v6
+if [[ $do_hw || $run_all ]]; then
+  if ! curl -s --connect-timeout 3 https://api4.ipify.org >/dev/null; then
+    echo -e "${RED}您的網路不通，請稍後再試（Your network is down, please try again later）${RESET}"
+    exit 1
+  fi
 else
-  echo -e "${RED}您的網路不通，請稍後再試（Your network is down, please try again later）${RESET}"
-  exit 1
+  if ! curl -s --connect-timeout 3 https://api64.ipify.org >/dev/null; then
+    echo -e "${RED}您的網路不通，請稍後再試（Your network is down, please try again later）${RESET}"
+    exit 1
+  fi
 fi
 if curl -s --connect-timeout 3 https://browser.geekbench.com >/dev/null; then
   gb=true
@@ -1594,8 +1802,8 @@ trap 'rm -rf "$TEMP_WORKDIR"' EXIT
 
 echo -e "${YELLOW}請注意，此腳本會收集您的錯誤信息、錯誤代碼、以及發生錯誤前一個指令或腳本，且也會收集您的變量，蒐集資訊在$LOG_FILE${RESET}" >&2
 echo -e "${YELLOW}Please be advised that this script will collect your error messages, error codes, the command or script executed immediately before the error occurred, and your variables. The collected information will be stored in $LOG_FILE.${RESET}" >&2
-read -p "是否啟用（Enable or disable）？[Default:Y]" confirm
 confirm=${confirm,,}
+confirm=${confirm:-y}
 if [[ $confirm == y || $confirm == "" ]]; then
   log_session_start "$@"
   trap 'handle_error' ERR
@@ -1630,7 +1838,7 @@ if [[ "$1" == "--install" ]]; then
   else
     echo "Failed to set up 'mb' command."
   fi
-  exit 0 # 完成安裝後退出
+  exit 0
 fi
 
 # --- 參數解析 ---
@@ -1723,6 +1931,7 @@ if $run_all; then
   hardware_benchmarks
   cpu_test
   cpu_oversell_test
+  disk_test
   ip_quality
   net_quality
   net_rounting
@@ -1743,11 +1952,13 @@ else
     hardware_benchmarks
     cpu_test
     cpu_oversell_test
+    disk_test
   fi
   
   if $do_oversell; then
     cpu_test
     cpu_oversell_test
+    disk_test
   fi
 
   if $do_ip; then
