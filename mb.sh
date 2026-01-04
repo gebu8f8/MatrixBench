@@ -1,4 +1,4 @@
-aaa#!/bin/bash
+#!/bin/bash
 # 檢查是否以root權限運行
 if [ "$(id -u)" -ne 0 ]; then
   echo "此腳本需要 root 權限才能執行（This script requires root privileges to run）" 
