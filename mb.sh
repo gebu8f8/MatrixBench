@@ -1,4 +1,4 @@
-#!/bin/bash
+aaa#!/bin/bash
 # 檢查是否以root權限運行
 if [ "$(id -u)" -ne 0 ]; then
   echo "此腳本需要 root 權限才能執行（This script requires root privileges to run）" 
@@ -35,7 +35,7 @@ YELLOW='\033[1;33m'  # ⚠️ 警告用黃色
 CYAN="\033[1;36m"    # ℹ️ 一般提示用青色
 RESET='\033[0m'      # 清除顏色
 
-version="v2026.01.03"
+version="v2026.01.04"
 
 handle_error() {
     local exit_code=$?
@@ -609,7 +609,7 @@ cpu_oversell_test() {
   local report="$HOME/result/hardware.txt"
   mkdir -p "$(dirname "$report")"
 
-  # --- 多語言文本定義 (最終修復版：使用 %b 顯示顏色) ---
+  # --- 多語言文本定義 (修改處：%.0f%% 改為 %s%%) ---
   case "$lang" in
   cn)
     local t_warm="系统非空闲 (当前CPU总使用率: %.0f%%)，测试结果可能不准。"
@@ -621,11 +621,11 @@ cpu_oversell_test() {
     local t_stress_start="${CYAN}静态分析完成，开始执行压力测试...${RESET}"
     local t_analysis="--- 最终分析结论 ---"
     local t_st_report="Steal Time (窃取时间) 峰值: %.2f%%"
-    local t_st_count_report="Steal Time (窃取时间) 非零次数: %d/%d (%.0f%%)"
+    local t_st_count_report="Steal Time (窃取时间) 非零次数: %d/%d (%s%%)" # 修改：%.0f -> %s
     local t_lat_report="标准测试最大延迟 (Std Latency): %s µs"
     local t_jitter_report="标准测试抖动范围 (Std Jitter) : %s µs"
     local t_stress_report="压力测试峰值延迟 (Stress Peak): %d µs"
-    local t_grade_report="综合性能评级 (Score): %b" # 使用 %b 解析颜色代码
+    local t_grade_report="综合性能评级 (Score): %b"
     local t_conclusion_st_fail="分析：检测到显著的 CPU Steal Time (>2.0%)。这表明 Hypervisor (底层母机) 无法稳定分配所承诺的 CPU 时间，性能会受到不可预测的严重影响。不适用于任何对稳定性有要求的生产环境。"
     local t_conclusion_lat_exc="分析：内核延迟极低且稳定 (平均 < 1500µs)。性能表现极其稳定，接近实体机水平，CPU 资源几乎无干扰。非常适用于延迟敏感型应用 (如游戏服务器、即时通讯)。"
     local t_conclusion_lat_good="分析：内核延迟存在轻微波动 (平均 1500µs - 4000µs)。这是典型且健康的共享虚拟化环境。CPU 资源与其他用户共享，存在轻度邻居干扰，适用于网站、博客等通用型应用。"
@@ -645,7 +645,7 @@ cpu_oversell_test() {
     local t_post_rest="${CYAN}First run complete, cooling down for 30 seconds...${RESET}"
     local t_analysis="--- Final Analysis Conclusion ---"
     local t_st_report="Peak Steal Time: %.2f%%"
-    local t_st_count_report="Non-zero Steal Time Count: %d/%d (%.0f%%)"
+    local t_st_count_report="Non-zero Steal Time Count: %d/%d (%s%%)" # 修改
     local t_lat_report="Max Kernel Latency: %s µs"
     local t_jitter_report="Std Jitter Range: %s µs"
     local t_stress_report="Stress Peak: %d µs"
@@ -669,7 +669,7 @@ cpu_oversell_test() {
     local t_post_rest="${CYAN}第一次測試完成，30 秒冷卻中...${RESET}"
     local t_analysis="--- 最終分析結論 ---"
     local t_st_report="Steal Time (竊取時間) 峰值: %.2f%%"
-    local t_st_count_report="Steal Time (竊取時間) 非零次數: %d/%d (%.0f%%)"
+    local t_st_count_report="Steal Time (竊取時間) 非零次數: %d/%d (%s%%)" # 修改
     local t_lat_report="最大內核延遲 (Max Latency): %s µs"
     local t_jitter_report="標準測試抖動範圍 (Std Jitter): %s µs"
     local t_stress_report="壓力測試峰值延遲 (Stress Peak): %d µs"
@@ -722,7 +722,7 @@ cpu_oversell_test() {
     fi
     local raw_output=$(cyclictest -t $cpu_co -p80 -i500 -d10 -l10000 -m 2>/dev/null | grep '^T:' | tail -n "$cpu_co")
 
-    # --- 停止監控 ---
+    # --- 停止監控 (修復 143 錯誤) ---
     kill $monitor_pid 2>/dev/null
     wait $monitor_pid 2>/dev/null || true
 
@@ -806,16 +806,23 @@ cpu_oversell_test() {
   echo "$t_analysis"
   
   [ -z "$peak_total_samples" ] || [ "$peak_total_samples" -eq 0 ] && peak_total_samples=1
-  local st_percent=0
-  st_percent=$(echo "$peak_nonzero_count * 100 / $peak_total_samples" | bc -l)
+  
+  # --- 百分比格式化邏輯 (修改處) ---
+  # 1. 計算原始數值 (保留小數)
+  local raw_percent=$(echo "$peak_nonzero_count * 100 / $peak_total_samples" | bc -l)
+  # 2. 四捨五入保留 1 位小數 (如 33.333 -> 33.3, 20.000 -> 20.0)
+  local formatted_percent=$(printf "%.1f" "$raw_percent")
+  # 3. 去掉末尾的 .0 (如 20.0 -> 20, 33.3 -> 33.3)
+  local final_percent="${formatted_percent%.0}"
 
   printf "$t_st_report\n" "$peak_st_value"
-  printf "$t_st_count_report\n" "$peak_nonzero_count" "$peak_total_samples" "$st_percent"
+  # 使用計算好的字符串 final_percent
+  printf "$t_st_count_report\n" "$peak_nonzero_count" "$peak_total_samples" "$final_percent"
   printf "$t_lat_report\n" "${latencies_str% }"
   printf "$t_jitter_report\n" "${jitters_str% }"
   printf "$t_stress_report\n" "$stress_peak_latency"
   
-  # === 1. 先生成「壓力結論」 (因為評級依賴這個結果) ===
+  # --- 1. 先生成「壓力結論」 ---
   local stress_conclusion
   if [[ ${#max_latencies[@]} -eq 2 ]] && \
      (( $(echo "$stress_peak_latency < ${max_latencies[0]}" | bc -l) )) && \
@@ -835,7 +842,7 @@ cpu_oversell_test() {
     fi
   fi
 
-  # === 2. 再進行評級 (Grade) ===
+  # --- 2. 再進行評級 (Grade) ---
   local grade="C"
   local color_grade=""
   local honesty_conclusion=""
@@ -846,7 +853,6 @@ cpu_oversell_test() {
     honesty_conclusion="$t_conclusion_st_fail"
   else
     if [[ "$avg_latency" -le 1500 ]]; then
-      # 基本延遲優秀，檢查壓力情況決定 S 或 A
       if [[ "$stress_conclusion" == *"$t_stress_conclusion_low_impact"* ]]; then
         grade="S (Excellent)"
         color_grade="${GREEN}$grade${RESET}"
@@ -866,11 +872,9 @@ cpu_oversell_test() {
     fi
   fi
   
-  # 輸出評級 (因為改用了 %b，所以顏色代碼會被正確解析)
   printf "$t_grade_report\n" "$color_grade" 
   echo "---"
 
-  # 輸出詳細結論
   echo -e "$honesty_conclusion"
   echo -e "$stress_conclusion"
 
@@ -884,7 +888,7 @@ cpu_oversell_test() {
     echo '```'
     echo ""
     printf "$t_st_report\n" "$peak_st_value"
-    printf "$t_st_count_report\n" "$peak_nonzero_count" "$peak_total_samples" "$st_percent"
+    printf "$t_st_count_report\n" "$peak_nonzero_count" "$peak_total_samples" "$final_percent"
     printf "$t_lat_report\n" "${latencies_str% }"
     printf "$t_jitter_report\n" "${jitters_str% }"
     printf "$t_stress_report\n" "$stress_peak_latency"
@@ -900,35 +904,45 @@ cpu_oversell_test() {
 disk_test() {
   local report="$HOME/result/hardware.txt"
   
-  # --- 多語言定義 (維持不變) ---
+  # --- 多語言定義 ---
   case "$lang" in
   cn)
     local t_title="## 磁盘 I/O 稳定性测试"
     local t_warm_disk="警告: 检测到硬盘繁忙 (当前最大利用率: %.1f%%)，测试结果可能受影响。"
-    local t_start="${CYAN}开始执行磁盘 I/O 稳定性测试 (参数: 60次请求, 约 60 秒)...${RESET}"
+    # 這裡動態顯示測試模式
+    local t_start_strict="${CYAN}开始执行磁盘 I/O 稳定性测试 (严格模式: Direct/Sync IO, 120次/60秒)...${RESET}"
+    local t_start_normal="${CYAN}开始执行磁盘 I/O 稳定性测试 (标准模式: Cached IO, 60次/60秒)...${RESET}"
     local t_raw_data="[原始数据] %s"
     local t_result="I/O 平均延迟: %.1f us | 抖动 (mdev): %.1f us"
     local t_grade="I/O 稳定性评级: %b"
+    local t_mode_strict="[模式] 严格 (Direct I/O) - 真实反映物理性能"
+    local t_mode_normal="[模式] 标准 (Cached I/O) - 模拟常规文件操作"
     ;;
   us)
     local t_title="## Disk I/O Stability Test"
     local t_warm_disk="Warning: Disk is busy (Current Max Util: %.1f%%), results may be inaccurate."
-    local t_start="${CYAN}Starting Disk I/O Stability Test (Params: 60 reqs, approx. 60s)...${RESET}"
+    local t_start_strict="${CYAN}Starting Disk I/O Stability Test (Strict Mode: Direct/Sync IO, 120req/60s)...${RESET}"
+    local t_start_normal="${CYAN}Starting Disk I/O Stability Test (Standard Mode: Cached IO, 60req/60s)...${RESET}"
     local t_raw_data="[Raw Data] %s"
     local t_result="I/O Avg Latency: %.1f us | Jitter (mdev): %.1f us"
     local t_grade="I/O Stability Score: %b"
+    local t_mode_strict="[Mode] Strict (Direct I/O) - Real Physical Performance"
+    local t_mode_normal="[Mode] Standard (Cached I/O) - Regular File Operations"
     ;;
   *)
     local t_title="## 磁盤 I/O 穩定性測試"
     local t_warm_disk="警告: 檢測到硬碟繁忙 (當前最大利用率: %.1f%%)，測試結果可能受影響。"
-    local t_start="${CYAN}開始執行磁盤 I/O 穩定性測試 (參數: 60次請求, 約 60 秒)...${RESET}"
+    local t_start_strict="${CYAN}開始執行磁盤 I/O 穩定性測試 (嚴格模式: Direct/Sync IO, 200次/100秒)...${RESET}"
+    local t_start_normal="${CYAN}開始執行磁盤 I/O 穩定性測試 (標準模式: Cached IO, 100次/100秒)...${RESET}"
     local t_raw_data="[原始數據] %s"
     local t_result="I/O 平均延遲: %.1f us | 抖動 (mdev): %.1f us"
     local t_grade="I/O 穩定性評級: %b"
+    local t_mode_strict="[模式] 嚴格 (Direct I/O) - 真實反映物理性能"
+    local t_mode_normal="[模式] 標準 (Cached I/O) - 模擬常規文件操作"
     ;;
   esac
 
-  # --- 0. 檢測硬碟繁忙程度 ---
+  # --- 0. 檢測硬碟繁忙 ---
   local disk_util=$(LC_ALL=C sar -d 1 1 | grep Average | grep -v DEV | awk '{print $NF}' | sort -rn | head -n1)
   if [[ "$disk_util" =~ ^[0-9.]+$ ]]; then
     if (( $(echo "$disk_util > 10.0" | bc -l) )); then
@@ -938,10 +952,30 @@ disk_test() {
       sleep 2
     fi
   fi
+  local test_cmd="ioping -a 2 -c 200 -i 0.5 -D -Y -q ."
+  local raw_line=""
+  local used_mode=""
+  local t_start_msg=""
+  local t_mode_msg=""
 
-  echo -e "\n$t_start"
-  # --- 2. 執行測試 (60次) ---
-  local raw_line=$(ioping -c 60 -q . 2>/dev/null | tail -n 1)
+  # 測試是否支持 -D -Y (有些容器或文件系統不支持 Direct IO)
+  # 先試跑 1 次看看有沒有報錯
+  if ioping -c 1 -D -Y . &>/dev/null; then
+    # 支持嚴格模式
+    t_start_msg="$t_start_strict"
+    t_mode_msg="$t_mode_strict"
+    echo -e "\n$t_start_msg"
+    raw_line=$($test_cmd 2>/dev/null | tail -n 1)
+  else
+    # 不支持，回退到標準模式 (60次, 1s間隔)
+    t_start_msg="$t_start_normal"
+    t_mode_msg="$t_mode_normal"
+    echo -e "\n$t_start_msg"
+    # 標準模式不加 -D -Y，間隔 1s
+    raw_line=$(ioping -a 2 -c 100 -q . 2>/dev/null | tail -n 1)
+  fi
+
+  # 防止空數據
   if [ -z "$raw_line" ]; then
     raw_line="min/avg/max/mdev = 0 us / 0 us / 0 us / 0 us"
   fi
@@ -970,7 +1004,6 @@ disk_test() {
   avg_us=${avg_us:-0}
   mdev_us=${mdev_us:-0}
 
-  # --- 4. 評級邏輯 (S/A/B/C/D/F) ---
   local grade="F"
   local color_grade=""
 
@@ -994,19 +1027,18 @@ disk_test() {
     color_grade="${RED}$grade${RESET}"
   fi
 
-  # --- 5. 輸出與寫入報告 (使用最安全的變量+cat方式) ---
-  
-  # 終端顯示 (保持顏色)
+  # --- 5. 輸出 ---
   printf "$t_raw_data\n" "$clean_raw_data"
   printf "$t_result\n" "$avg_us" "$mdev_us"
   printf "$t_grade\n" "$color_grade"
 
-  # 預先格式化要寫入文件的純文本字符串 (這一步能隔離錯誤)
   local file_result=$(printf "$t_result" "$avg_us" "$mdev_us")
   local file_grade=$(printf "$t_grade" "$grade")
+
   cat <<EOF >> "$report"
 
 $t_title
+$t_mode_msg
 \`\`\`
 $raw_line
 \`\`\`
