@@ -35,7 +35,7 @@ YELLOW='\033[1;33m'  # ⚠️ 警告用黃色
 CYAN="\033[1;36m"    # ℹ️ 一般提示用青色
 RESET='\033[0m'      # 清除顏色
 
-version="v2026.01.04"
+version="v2026.01.05"
 
 handle_error() {
     local exit_code=$?
@@ -387,6 +387,7 @@ hardware_benchmarks() (
     local gb6_section=$(echo "$yabs_output" | awk '/Geekbench 6 Benchmark Test:/, /YABS completed in/ {if ($0 !~ /YABS completed in/) print}')
     local gb6_single_score=$(echo "$gb6_section" | grep 'Single Core' | awk '{print $4}')
     local gb6_multi_score=$(echo "$gb6_section" | grep 'Multi Core' | awk '{print $4}')
+    local gb6_url=$(echo "$gb6_section" | grep 'Full Test' | awk '{print $NF}')
   fi
 
   # 記憶體解析 (採用您優化的版本)
@@ -434,6 +435,7 @@ hardware_benchmarks() (
       local t_single="单核"
       local t_multi="多核"
       local t_cpu_gb6="CPU测试（GeekBench 6）"
+      local t_gb_hint="URL（如果您单/多核心分数有下降，您可以查看此url，通常都是Text Compression将平均分拉低了）"
       local t_memory="内存测试"
       local t_read="读取"
       local t_write="写入"
@@ -445,6 +447,7 @@ hardware_benchmarks() (
       local t_single="Single Core"
       local t_multi="Multi Core"
       local t_cpu_gb6="CPU Test (GeekBench 6)"
+      local t_gb_hint="URL (Check this if scores allow, often due to Text Compression lowering the average)"
       local t_memory="Memory Test"
       local t_read="Read"
       local t_write="Write"
@@ -456,6 +459,7 @@ hardware_benchmarks() (
       local t_single="單核"
       local t_multi="多核"
       local t_cpu_gb6="CPU測試（GeekBench 6）"
+      local t_gb_hint="URL（如果您單/多核心分數有下降，您可以查看此url，通常都是Text Compression將平均分拉低了）"
       local t_memory="記憶體測試"
       local t_read="讀取"
       local t_write="寫入"
@@ -477,6 +481,7 @@ hardware_benchmarks() (
       echo "## $t_cpu_gb6"
       echo "${t_single}：${gb6_single_score:-N/A}"
       echo "${t_multi}：${gb6_multi_score:-N/A}"
+      echo "${t_gb_hint}：${gb6_url:-N/A}"
       echo ""
     fi
     echo "## $t_memory"
@@ -909,11 +914,11 @@ disk_test() {
   cn)
     local t_title="## 磁盘 I/O 稳定性测试"
     local t_warm_disk="警告: 检测到硬盘繁忙 (当前最大利用率: %.1f%%)，测试结果可能受影响。"
-    # 這裡動態顯示測試模式
-    local t_start_strict="${CYAN}开始执行磁盘 I/O 稳定性测试 (严格模式: Direct/Sync IO, 120次/60秒)...${RESET}"
-    local t_start_normal="${CYAN}开始执行磁盘 I/O 稳定性测试 (标准模式: Cached IO, 60次/60秒)...${RESET}"
+    # 提示用戶需要等待較長時間
+    local t_start_strict="${CYAN}开始执行磁盘 I/O 稳定性测试 (严格模式: Direct/Sync IO, 200次/约100秒, 请耐心等待)...${RESET}"
+    local t_start_normal="${CYAN}开始执行磁盘 I/O 稳定性测试 (标准模式: Cached IO, 100次/约100秒, 请耐心等待)...${RESET}"
     local t_raw_data="[原始数据] %s"
-    local t_result="I/O 平均延迟: %.1f us | 抖动 (mdev): %.1f us"
+    local t_result="I/O 平均延迟: %.1f us | 最大延迟: %.1f us | 抖动 (mdev): %.1f us"
     local t_grade="I/O 稳定性评级: %b"
     local t_mode_strict="[模式] 严格 (Direct I/O) - 真实反映物理性能"
     local t_mode_normal="[模式] 标准 (Cached I/O) - 模拟常规文件操作"
@@ -921,10 +926,10 @@ disk_test() {
   us)
     local t_title="## Disk I/O Stability Test"
     local t_warm_disk="Warning: Disk is busy (Current Max Util: %.1f%%), results may be inaccurate."
-    local t_start_strict="${CYAN}Starting Disk I/O Stability Test (Strict Mode: Direct/Sync IO, 120req/60s)...${RESET}"
-    local t_start_normal="${CYAN}Starting Disk I/O Stability Test (Standard Mode: Cached IO, 60req/60s)...${RESET}"
+    local t_start_strict="${CYAN}Starting Disk I/O Stability Test (Strict Mode: Direct/Sync IO, 200req/~100s, please wait)...${RESET}"
+    local t_start_normal="${CYAN}Starting Disk I/O Stability Test (Standard Mode: Cached IO, 100req/~100s, please wait)...${RESET}"
     local t_raw_data="[Raw Data] %s"
-    local t_result="I/O Avg Latency: %.1f us | Jitter (mdev): %.1f us"
+    local t_result="I/O Avg Latency: %.1f us | Max Latency: %.1f us | Jitter (mdev): %.1f us"
     local t_grade="I/O Stability Score: %b"
     local t_mode_strict="[Mode] Strict (Direct I/O) - Real Physical Performance"
     local t_mode_normal="[Mode] Standard (Cached I/O) - Regular File Operations"
@@ -932,15 +937,17 @@ disk_test() {
   *)
     local t_title="## 磁盤 I/O 穩定性測試"
     local t_warm_disk="警告: 檢測到硬碟繁忙 (當前最大利用率: %.1f%%)，測試結果可能受影響。"
-    local t_start_strict="${CYAN}開始執行磁盤 I/O 穩定性測試 (嚴格模式: Direct/Sync IO, 200次/100秒)...${RESET}"
-    local t_start_normal="${CYAN}開始執行磁盤 I/O 穩定性測試 (標準模式: Cached IO, 100次/100秒)...${RESET}"
+    local t_start_strict="${CYAN}開始執行磁盤 I/O 穩定性測試 (嚴格模式: Direct/Sync IO, 200次/約100秒, 請耐心等待)...${RESET}"
+    local t_start_normal="${CYAN}開始執行磁盤 I/O 穩定性測試 (標準模式: Cached IO, 100次/約100秒, 請耐心等待)...${RESET}"
     local t_raw_data="[原始數據] %s"
-    local t_result="I/O 平均延遲: %.1f us | 抖動 (mdev): %.1f us"
+    local t_result="I/O 平均延遲: %.1f us | 最大延遲: %.1f us | 抖動 (mdev): %.1f us"
     local t_grade="I/O 穩定性評級: %b"
     local t_mode_strict="[模式] 嚴格 (Direct I/O) - 真實反映物理性能"
     local t_mode_normal="[模式] 標準 (Cached I/O) - 模擬常規文件操作"
     ;;
   esac
+
+  sleep 20
 
   # --- 0. 檢測硬碟繁忙 ---
   local disk_util=$(LC_ALL=C sar -d 1 1 | grep Average | grep -v DEV | awk '{print $NF}' | sort -rn | head -n1)
@@ -952,26 +959,30 @@ disk_test() {
       sleep 2
     fi
   fi
+
   local test_cmd="ioping -a 2 -c 200 -i 0.5 -D -Y -q ."
   local raw_line=""
-  local used_mode=""
   local t_start_msg=""
   local t_mode_msg=""
 
-  # 測試是否支持 -D -Y (有些容器或文件系統不支持 Direct IO)
-  # 先試跑 1 次看看有沒有報錯
+  # --- 2. 執行測試 (同步阻塞模式) ---
+  
+  # 測試是否支持 -D -Y
   if ioping -c 1 -D -Y . &>/dev/null; then
     # 支持嚴格模式
     t_start_msg="$t_start_strict"
     t_mode_msg="$t_mode_strict"
     echo -e "\n$t_start_msg"
+    
+    # 直接執行，不加 &，腳本會在這裡「暫停」直到測試完成
     raw_line=$($test_cmd 2>/dev/null | tail -n 1)
   else
-    # 不支持，回退到標準模式 (60次, 1s間隔)
+    # 不支持，回退
     t_start_msg="$t_start_normal"
     t_mode_msg="$t_mode_normal"
     echo -e "\n$t_start_msg"
-    # 標準模式不加 -D -Y，間隔 1s
+    
+    # 標準模式
     raw_line=$(ioping -a 2 -c 100 -q . 2>/dev/null | tail -n 1)
   fi
 
@@ -985,6 +996,7 @@ disk_test() {
 
   # --- 3. 數據提取與單位換算 (目標: us) ---
   local avg_str=$(echo "$data_part" | awk -F' / ' '{print $2}')
+  local max_str=$(echo "$data_part" | awk -F' / ' '{print $3}')
   local mdev_str=$(echo "$data_part" | awk -F' / ' '{print $4}')
 
   convert_to_us() {
@@ -999,11 +1011,14 @@ disk_test() {
   }
 
   local avg_us=$(convert_to_us "$avg_str")
+  local max_us=$(convert_to_us "$max_str")
   local mdev_us=$(convert_to_us "$mdev_str")
   
   avg_us=${avg_us:-0}
+  max_us=${max_us:-0}
   mdev_us=${mdev_us:-0}
 
+  # --- 4. 評級邏輯 ---
   local grade="F"
   local color_grade=""
 
@@ -1029,10 +1044,10 @@ disk_test() {
 
   # --- 5. 輸出 ---
   printf "$t_raw_data\n" "$clean_raw_data"
-  printf "$t_result\n" "$avg_us" "$mdev_us"
+  printf "$t_result\n" "$avg_us" "$max_us" "$mdev_us"
   printf "$t_grade\n" "$color_grade"
 
-  local file_result=$(printf "$t_result" "$avg_us" "$mdev_us")
+  local file_result=$(printf "$t_result" "$avg_us" "$max_us" "$mdev_us")
   local file_grade=$(printf "$t_grade" "$grade")
 
   cat <<EOF >> "$report"
@@ -1812,17 +1827,7 @@ case $1 in
   exit 0
   ;;
 esac
-if [[ $do_hw || $run_all ]]; then
-  if ! curl -s --connect-timeout 3 https://api4.ipify.org >/dev/null; then
-    echo -e "${RED}您的網路不通，請稍後再試（Your network is down, please try again later）${RESET}"
-    exit 1
-  fi
-else
-  if ! curl -s --connect-timeout 3 https://api64.ipify.org >/dev/null; then
-    echo -e "${RED}您的網路不通，請稍後再試（Your network is down, please try again later）${RESET}"
-    exit 1
-  fi
-fi
+
 if curl -s --connect-timeout 3 https://browser.geekbench.com >/dev/null; then
   gb=true
 else
@@ -1954,6 +1959,17 @@ if $run_all || $do_hw || $do_ip || $do_nq || $do_nr || $do_stream; then
     chromium_comm="chromium"
   elif command -v chromium-browser >/dev/null 2>&1; then
     chromium_comm="chromium-browser"
+  fi
+fi
+if $do_hw || $run_all; then
+  if ! curl -s --connect-timeout 3 https://api4.ipify.org >/dev/null; then
+    echo -e "${RED}您的網路不通，請稍後再試（Your network is down, please try again later）${RESET}"
+    exit 1
+  fi
+else
+  if ! curl -s --connect-timeout 3 https://api64.ipify.org >/dev/null; then
+    echo -e "${RED}您的網路不通，請稍後再試（Your network is down, please try again later）${RESET}"
+    exit 1
   fi
 fi
 # --- 執行對應功能 ---
