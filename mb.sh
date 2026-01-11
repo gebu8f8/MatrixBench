@@ -35,7 +35,7 @@ YELLOW='\033[1;33m'  # ⚠️ 警告用黃色
 CYAN="\033[1;36m"    # ℹ️ 一般提示用青色
 RESET='\033[0m'      # 清除顏色
 
-version="v2026.01.05"
+version="v2026.01.11"
 
 handle_error() {
     local exit_code=$?
@@ -614,7 +614,6 @@ cpu_oversell_test() {
   local report="$HOME/result/hardware.txt"
   mkdir -p "$(dirname "$report")"
 
-  # --- 多語言文本定義 (修改處：%.0f%% 改為 %s%%) ---
   case "$lang" in
   cn)
     local t_warm="系统非空闲 (当前CPU总使用率: %.0f%%)，测试结果可能不准。"
@@ -626,9 +625,8 @@ cpu_oversell_test() {
     local t_stress_start="${CYAN}静态分析完成，开始执行压力测试...${RESET}"
     local t_analysis="--- 最终分析结论 ---"
     local t_st_report="Steal Time (窃取时间) 峰值: %.2f%%"
-    local t_st_count_report="Steal Time (窃取时间) 非零次数: %d/%d (%s%%)" # 修改：%.0f -> %s
+    local t_st_count_report="Steal Time (窃取时间) 非零次数: %d/%d (%s%%)"
     local t_lat_report="标准测试最大延迟 (Std Latency): %s µs"
-    local t_jitter_report="标准测试抖动范围 (Std Jitter) : %s µs"
     local t_stress_report="压力测试峰值延迟 (Stress Peak): %d µs"
     local t_grade_report="综合性能评级 (Score): %b"
     local t_conclusion_st_fail="分析：检测到显著的 CPU Steal Time (>2.0%)。这表明 Hypervisor (底层母机) 无法稳定分配所承诺的 CPU 时间，性能会受到不可预测的严重影响。不适用于任何对稳定性有要求的生产环境。"
@@ -650,9 +648,8 @@ cpu_oversell_test() {
     local t_post_rest="${CYAN}First run complete, cooling down for 30 seconds...${RESET}"
     local t_analysis="--- Final Analysis Conclusion ---"
     local t_st_report="Peak Steal Time: %.2f%%"
-    local t_st_count_report="Non-zero Steal Time Count: %d/%d (%s%%)" # 修改
+    local t_st_count_report="Non-zero Steal Time Count: %d/%d (%s%%)"
     local t_lat_report="Max Kernel Latency: %s µs"
-    local t_jitter_report="Std Jitter Range: %s µs"
     local t_stress_report="Stress Peak: %d µs"
     local t_grade_report="Overall Score: %b"
     local t_conclusion_st_fail="Analysis: Significant CPU Steal Time (>2.0%) was detected. This indicates the Hypervisor is failing to provide the guaranteed CPU time, leading to unpredictable and severe performance degradation. Not suitable for any production environment that requires stability."
@@ -674,9 +671,8 @@ cpu_oversell_test() {
     local t_post_rest="${CYAN}第一次測試完成，30 秒冷卻中...${RESET}"
     local t_analysis="--- 最終分析結論 ---"
     local t_st_report="Steal Time (竊取時間) 峰值: %.2f%%"
-    local t_st_count_report="Steal Time (竊取時間) 非零次數: %d/%d (%s%%)" # 修改
+    local t_st_count_report="Steal Time (竊取時間) 非零次數: %d/%d (%s%%)"
     local t_lat_report="最大內核延遲 (Max Latency): %s µs"
-    local t_jitter_report="標準測試抖動範圍 (Std Jitter): %s µs"
     local t_stress_report="壓力測試峰值延遲 (Stress Peak): %d µs"
     local t_grade_report="綜合性能評級 (Score): %b"
     local t_conclusion_st_fail="分析：檢測到顯著的 CPU Steal Time (>2.0%)。這表明 Hypervisor (底層母機) 無法穩定分配所承諾的 CPU 時間，性能會受到不可預測的嚴重影響。不適用於任何對穩定性有要求的生產環境。"
@@ -707,7 +703,6 @@ cpu_oversell_test() {
   local all_poetic_outputs=""
   local cpu_count=$(nproc)
   local -a max_latencies=()
-  local -a jitters=()
   local test_rounds=2
 
   # --- 第一部分：標準靜態分析 ---
@@ -719,19 +714,33 @@ cpu_oversell_test() {
     local monitor_pid=$!
     sleep 0.5
 
-    # --- 執行 cyclictest ---
+    # --- 執行 cyclictest (綁核 + 優先級95) ---
+    local affinity_cmd=""
     if [ "$cpu_count" -eq 1 ]; then
-      cpu_co=$cpu_count
+      cpu_co=1
+      affinity_cmd="-a 0"
     else
+      # 多核情況：跑 N-1 個線程
       cpu_co=$(echo "$cpu_count - 1" | bc)
+      
+      # 計算最後一個核心的編號 (總核數 - 1)
+      local last_core=$((cpu_count - 1))
+      
+      # 構建綁核參數，避免出現 1-1 這種尷尬的寫法
+      if [ "$last_core" -eq 1 ]; then
+          affinity_cmd="-a 1"
+      else
+          affinity_cmd="-a 1-$last_core"
+      fi
     fi
-    local raw_output=$(cyclictest -t $cpu_co -p80 -i500 -d10 -l10000 -m 2>/dev/null | grep '^T:' | tail -n "$cpu_co")
+    
+    # 執行命令：加入 $affinity_cmd，並將 -p80 改為 -p95
+    local raw_output=$(cyclictest -t $cpu_co $affinity_cmd -p95 -i500 -d10 -l10000 -m 2>/dev/null | grep '^T:' | tail -n "$cpu_co")
 
-    # --- 停止監控 (修復 143 錯誤) ---
+    # --- 停止監控 ---
     kill $monitor_pid 2>/dev/null
     wait $monitor_pid 2>/dev/null || true
 
-    # --- 格式化 cyclictest 輸出 ---
     local poetic_output=$(echo "$raw_output" | awk '{
       min=""; avg=""; max="";
       for(i=1; i<=NF; i++) { 
@@ -739,22 +748,15 @@ cpu_oversell_test() {
         if($i == "Avg:") avg=$(i+1); 
         if($i == "Max:") max=$(i+1); 
       }
-      jitter = (max - min);
-      printf "T%-2s Min: %-5s Avg: %-5s Max: %-5s Jitter: %-5s\n", $2, min, avg, max, jitter
+      printf "T%-2s Min: %-5s Avg: %-5s Max: %-5s\n", $2, min, avg, max
     }')
     echo "$poetic_output"
     all_poetic_outputs+="[Round $i]\n$poetic_output\n"
 
     # --- 提取數據 ---
     local run_max_latency=$(echo "$raw_output" | awk -F'Max: ' '{print $2}' | awk '{print $1}' | sort -rn | head -n1)
-    local run_max_jitter=$(echo "$raw_output" | awk '{
-       min=""; max="";
-       for(i=1; i<=NF; i++) { if($i == "Min:") min=$(i+1); if($i == "Max:") max=$(i+1); }
-       print (max - min)
-    }' | sort -rn | head -n1)
-
+    
     max_latencies+=( "${run_max_latency:-0}" )
-    jitters+=( "${run_max_jitter:-0}" )
 
     # --- 分析 sar ---
     local sar_stats=$(awk '
@@ -788,7 +790,6 @@ cpu_oversell_test() {
   done
   
   local latencies_str=$(printf '%s ' "${max_latencies[@]}"; echo)
-  local jitters_str=$(printf '%s ' "${jitters[@]}"; echo)
   local avg_latency=0
   local sum=0
   for val in "${max_latencies[@]}"; do sum=$((sum + val)); done
@@ -800,7 +801,8 @@ cpu_oversell_test() {
   [ $stress_threads -gt 128 ] && stress_threads=128
   printf "$t_stress_params\n" "$stress_threads"
   
-  local stress_raw_output=$(cyclictest -t $stress_threads -p80 -i500 -d10 -l10000 -m 2>/dev/null | grep '^T:' | tail -n "$stress_threads")
+  # 壓力測試通常不綁核，讓它佔滿所有資源
+  local stress_raw_output=$(cyclictest -t $stress_threads -p95 -i500 -d10 -l10000 -m 2>/dev/null | grep '^T:' | tail -n "$stress_threads")
   echo "$stress_raw_output"
   local stress_peak_latency=$(echo "$stress_raw_output" | awk -F'Max: ' '{print $2}' | awk '{print $1}' | sort -rn | head -n1)
   stress_peak_latency=${stress_peak_latency:-0}
@@ -812,19 +814,13 @@ cpu_oversell_test() {
   
   [ -z "$peak_total_samples" ] || [ "$peak_total_samples" -eq 0 ] && peak_total_samples=1
   
-  # --- 百分比格式化邏輯 (修改處) ---
-  # 1. 計算原始數值 (保留小數)
   local raw_percent=$(echo "$peak_nonzero_count * 100 / $peak_total_samples" | bc -l)
-  # 2. 四捨五入保留 1 位小數 (如 33.333 -> 33.3, 20.000 -> 20.0)
   local formatted_percent=$(printf "%.1f" "$raw_percent")
-  # 3. 去掉末尾的 .0 (如 20.0 -> 20, 33.3 -> 33.3)
   local final_percent="${formatted_percent%.0}"
 
   printf "$t_st_report\n" "$peak_st_value"
-  # 使用計算好的字符串 final_percent
   printf "$t_st_count_report\n" "$peak_nonzero_count" "$peak_total_samples" "$final_percent"
   printf "$t_lat_report\n" "${latencies_str% }"
-  printf "$t_jitter_report\n" "${jitters_str% }"
   printf "$t_stress_report\n" "$stress_peak_latency"
   
   # --- 1. 先生成「壓力結論」 ---
@@ -895,7 +891,6 @@ cpu_oversell_test() {
     printf "$t_st_report\n" "$peak_st_value"
     printf "$t_st_count_report\n" "$peak_nonzero_count" "$peak_total_samples" "$final_percent"
     printf "$t_lat_report\n" "${latencies_str% }"
-    printf "$t_jitter_report\n" "${jitters_str% }"
     printf "$t_stress_report\n" "$stress_peak_latency"
     printf "$t_grade_report\n" "$grade" 
     echo ""
