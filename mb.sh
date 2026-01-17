@@ -275,9 +275,9 @@ ecs_download() {
 
   # 5. 解壓縮檔案
   # 使用 -o 選項會覆蓋任何已存在的同名檔案，-d 指定解壓縮的目的地
-  unzip -o "$ZIPPED_FILE_PATH" -d "$TEMP_WORKDIR"
+  unzip -o "$ZIPPED_FILE_PATH" -d "$TEMP_WORKDIR" >/dev/null
   # 6. 刪除壓縮檔
-  rm "$ZIPPED_FILE_PATH"
+  rm -f "$ZIPPED_FILE_PATH"
 }
 
 ecs_simple_static() (
@@ -313,7 +313,6 @@ ecs_simple_static() (
   esac
 
   echo -e "${CYAN}${t_reading}${RESET}"
-  mkdir -p "$RESULT_DIR"
   cd "$TEMP_WORKDIR" || exit 1
   
   script -qfc "$EXECUTABLE_PATH -l $lang_param -menu=false -log=false \
@@ -342,7 +341,7 @@ ecs_simple_static() (
     --screenshot=$FINAL_IMAGE_FILE\
     --window-size=1000,1000 \
     file://$TEMP_HTML >/dev/null 2>&1
-  mogrify -trim $FINAL_IMAGE_FILE
+  mogrify -trim $FINAL_IMAGE_FILE >/dev/null 2>&1
 )
 
 hardware_benchmarks() (
@@ -423,10 +422,6 @@ hardware_benchmarks() (
   local disk_r_1m=$(parse_disk_speed "$goecs_output" "1m" 3)
   local disk_w_1m=$(parse_disk_speed "$goecs_output" "1m" 5)
   local disk_t_1m=$(parse_disk_speed "$goecs_output" "1m" 7)
-
-
-  # --- 步驟 5: 創建目錄並寫入格式化後的結果 ---
-  mkdir -p "$RESULT_DIR"
 
   # 根據語言設定文字
   case "$lang" in
@@ -612,8 +607,6 @@ cpu_test() {
 
 cpu_oversell_test() {
   local report="$HOME/result/hardware.txt"
-  mkdir -p "$(dirname "$report")"
-
   case "$lang" in
   cn)
     local t_warm="系统非空闲 (当前CPU总使用率: %.0f%%)，测试结果可能不准。"
@@ -1065,9 +1058,6 @@ ip_quality() {
   local FINAL_IMAGE_FILE="${RESULT_DIR}/IP.png"
 
   echo -e "${CYAN}$ip_quality_1...${RESET}"
-  
-  mkdir -p "$RESULT_DIR"
-
   case $lang in
   us)
     ipcecek='-l en'
@@ -1084,7 +1074,7 @@ ip_quality() {
     --screenshot=$FINAL_IMAGE_FILE \
     --window-size=2000,10000 \
     file://$TEMP_SVG >/dev/null 2>&1
-  mogrify -trim $FINAL_IMAGE_FILE
+  mogrify -trim $FINAL_IMAGE_FILE >/dev/null 2>&1
 }
 
 net_quality() {
@@ -1114,9 +1104,6 @@ net_quality() {
       esac
     fi
   done
-  
-  mkdir -p "$RESULT_DIR"
-
   case $lang in
   us)
     netcecek='-l en'
@@ -1175,7 +1162,7 @@ net_quality() {
     --screenshot=$FINAL_IMAGE_FILE\
     --window-size=2000,10000 \
     file://$TEMP_HTML >/dev/null 2>&1
-  mogrify -trim $FINAL_IMAGE_FILE
+  mogrify -trim $FINAL_IMAGE_FILE >/dev/null 2>&1
 }
 net_rounting() {
   if [[ "$lang" != cn ]]; then
@@ -1269,7 +1256,7 @@ net_rounting() {
     --screenshot=$FINAL_IMAGE_FILE\
     --window-size=2000,10000 \
     file://$TEMP_HTML >/dev/null 2>&1
-  mogrify -trim $FINAL_IMAGE_FILE
+  mogrify -trim $FINAL_IMAGE_FILE $HOME/result
 }
 streaming_unlock() {
   local RAW_ANSI_OUTPUT="${TEMP_WORKDIR}/streaming_report.ansi"
@@ -1326,7 +1313,7 @@ streaming_unlock() {
     --screenshot=$FINAL_IMAGE_FILE\
     --window-size=1000,2000 \
     file://$TEMP_HTML >/dev/null 2>&1
-  mogrify -trim $FINAL_IMAGE_FILE
+  mogrify -trim $FINAL_IMAGE_FILE >/dev/null 2>&1
 }
 speedtest_data() {
   local raw_data="$1"
@@ -1426,9 +1413,7 @@ speedtest_global_iperf3() {
 
   local RESULT_DIR="$HOME/result"
   local output_file="${RESULT_DIR}/global_net.txt"
-
-  mkdir -p "$RESULT_DIR"
-
+  
   case "$lang" in
     cn)
       local t_running="正在执行全球网络测速 (iperf3 模式)..."
@@ -1544,7 +1529,6 @@ speedtest_global_iperf3() {
 speedtest_global() {
   local RESULT_DIR="$HOME/result"
   local output_file="${RESULT_DIR}/global_net.txt"
-  mkdir -p "$RESULT_DIR"
 
   # 根據語言設定文字
   case "$lang" in
@@ -1604,7 +1588,6 @@ EOF
 
 ping_test(){
   local report="$HOME/result/ping.txt"
-  mkdir -p "$(dirname "$report")"
 
   # 根據語言設定文字
   case "$lang" in
@@ -1667,9 +1650,6 @@ ping_test(){
 }
 aria2_test(){
   local report_file="$HOME/result/stability_net.txt"
-  
-  mkdir -p "$(dirname "$report_file")"
-
   # 根據語言設定文字
   case "$lang" in
     cn)
@@ -1816,6 +1796,11 @@ all_report() {
   echo "$t_batch_reports$RESULT_DIR folder（資料夾）"
   echo -e "${YELLOW}$t_warning${RESET}"
 }
+create_folder(){
+  if ! ls $HOME/result >/dev/null 2>&1; then
+    mkdir -p $HOME/result
+  fi
+}
 case $1 in
 -V|-v|--version)
   echo "MatrixBench Version: $version"
@@ -1844,6 +1829,7 @@ fi
 # 初始化
 check_system
 check_app
+create_folder
 # --- Flag 初始化 ---
 do_hw=false
 do_ip=false
@@ -1872,6 +1858,7 @@ if [[ "$1" == "--install" ]]; then
   fi
   exit 0
 fi
+
 
 # --- 參數解析 ---
 while [[ $# -gt 0 ]]; do
