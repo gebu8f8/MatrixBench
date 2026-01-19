@@ -890,9 +890,10 @@ cpu_oversell_test() {
   printf "$t_stress_params\n" "$stress_threads"
   
   local stress_raw_output=$(cyclictest -t $stress_threads -p95 -i500 -d10 -l10000 -m 2>/dev/null | grep '^T:' | tail -n "$stress_threads")
+  echo "$stress_raw_output"
   local stress_peak_latency=$(echo "$stress_raw_output" | awk -F'Max: ' '{print $2}' | awk '{print $1}' | sort -rn | head -n1)
   stress_peak_latency=${stress_peak_latency:-0}
-  all_poetic_outputs+="\n[Stress Test - ${stress_threads} Threads]\nPeak Latency: $stress_peak_latency µs\n"
+  all_poetic_outputs+="\n[Stress Test - ${stress_threads} Threads]\n$stress_raw_output\n"
 
   # --- 第三部分：智能評級 ---
   echo -e "\n--------------------------"
