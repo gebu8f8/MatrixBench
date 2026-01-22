@@ -35,7 +35,7 @@ YELLOW='\033[1;33m'  # ⚠️ 警告用黃色
 CYAN="\033[1;36m"    # ℹ️ 一般提示用青色
 RESET='\033[0m'      # 清除顏色
 
-version="v2026.01.19"
+version="v2026.01.22"
 
 handle_error() {
     local exit_code=$?
@@ -1299,6 +1299,233 @@ $file_grade
 EOF
 }
 
+seven_zip_test() (
+  local report="$HOME/result/hardware.txt"
+  # --- 1. 定義語言字串 ---
+  case "$lang" in
+    cn)
+      local t_title="## 7-Zip CPU 性能基准测试 (3轮平均)"
+      local t_check_ver="正在检测并获取最新 7-Zip 版本 (GitHub)..."
+      local t_installing="正在下载并配置 7-Zip (%s)..."
+      local t_round_start="=== 开始执行第 %d 轮测试 (共 3 轮) ==="
+      local t_warm="警告: 系统非空闲 (当前CPU总使用率: %.0f%%)，测试结果可能不准。"
+      local t_cooldown="正在冷却 CPU (休息 30 秒)..."
+      local t_running="${CYAN}正在运行 7-Zip 基准测试 (多线程模式)...${RESET}"
+      local t_freq="CPU 频率 (全核心实测范围)"
+      local t_cores="核心数"
+      local t_scores="三次评分"
+      local t_avg="平均分"
+      local t_jitter="差异倍率 (抖动)"
+      local t_jitter_desc="(数值越小越稳定)"
+      local t_ref="参考范围 (基于实测资源)"
+      local t_ref_desc="[参考] 现代 CPU 單核分數通常在 3500-6000 MIPS 之间"
+      local t_final_output="${GREEN}测试完成。平均分: %s | 抖动: %s | 频率: %s${RESET}"
+      ;;
+    us)
+      local t_title="## 7-Zip CPU Performance Benchmark (3-Run Avg)"
+      local t_check_ver="Checking and fetching latest 7-Zip version (GitHub)..."
+      local t_installing="Downloading and configuring 7-Zip (%s)..."
+      local t_round_start="=== Starting Run %d of 3 ==="
+      local t_warm="Warning: System busy (CPU Usage: %.0f%%), results may be inaccurate."
+      local t_cooldown="Cooling down CPU (Resting 30s)..."
+      local t_running="${CYAN}Running 7-Zip Benchmark (Multi-threading)...${RESET}"
+      local t_freq="CPU Freq (Measured Range)"
+      local t_cores="Cores"
+      local t_scores="Run Scores"
+      local t_avg="Average Score"
+      local t_jitter="Deviation Ratio"
+      local t_jitter_desc="(Lower is better)"
+      local t_ref="Reference (Based on Usage)"
+      local t_ref_desc="[Ref] Modern CPUs typically score 3500-6000 MIPS per core"
+      local t_final_output="${GREEN}Test Complete. Avg: %s | Dev: %s | Freq: %s${RESET}"
+      ;;
+    *)
+      local t_title="## 7-Zip CPU 性能基準測試 (3輪平均)"
+      local t_check_ver="正在檢測並獲取最新 7-Zip 版本 (GitHub)..."
+      local t_installing="正在下載並配置 7-Zip (%s)..."
+      local t_round_start="=== 開始執行第 %d 輪測試 (共 3 輪) ==="
+      local t_warm="警告: 系統非空閒 (當前CPU總使用率: %.0f%%)，測試結果可能不準。"
+      local t_cooldown="正在冷卻 CPU (休息 30 秒)..."
+      local t_running="${CYAN}正在執行 7-Zip 基準測試 (多線程模式)...${RESET}"
+      local t_freq="CPU 頻率 (全核心實測範圍)"
+      local t_cores="核心數"
+      local t_scores="三次評分"
+      local t_avg="平均分"
+      local t_jitter="差異倍率 (抖動)"
+      local t_jitter_desc="(數值越小越穩定)"
+      local t_ref="參照範圍 (基於實測資源)"
+      local t_ref_desc="[參照] 現代 CPU 單核分數通常在 3500-6000 MIPS 之間"
+      local t_final_output="${GREEN}測試完成。平均分: %s | 抖動: %s | 頻率: %s${RESET}"
+      ;;
+  esac
+  
+  local cpu_usage=$(mpstat 1 1 | awk '/Average/ {print 100 - $12}')
+  if [ -n "$cpu_usage" ] && [ "$(echo "$cpu_usage > 10" | bc)" -eq 1 ]; then
+    printf "${YELLOW}"
+    printf "$t_warm" "$cpu_usage"
+    printf "${RESET}\n"
+  fi
+
+  # --- 2. 準備環境與動態下載 ---
+  cd "$TEMP_WORKDIR" || exit 1
+
+  if [ ! -f "7zz" ]; then
+    echo -e "$t_check_ver"
+    local latest_tag=$(curl -sL -o /dev/null -w %{url_effective} https://github.com/ip7z/7zip/releases/latest | awk -F'/' '{print $NF}')
+      
+    # 去除點 (25.01 -> 2501)
+    local ver_num
+    ver_num=$(echo "$latest_tag" | tr -d '.')
+      
+    # 架構檢測
+    local arch
+      arch=$(uname -m)
+    local os_type="linux-x64"
+    if [[ "$arch" == "aarch64" || "$arch" == "arm64" ]]; then
+      os_type="linux-arm64"
+    fi
+
+    local download_url="https://github.com/ip7z/7zip/releases/download/${latest_tag}/7z${ver_num}-${os_type}.tar.xz"
+      
+    printf "$t_installing\n" "$latest_tag ($arch)"
+    wget -qO 7z_latest.tar.xz "$download_url"
+    if [ $? -eq 0 ]; then
+      tar -xf 7z_latest.tar.xz
+      chmod +x 7zz
+    else
+      echo "Error: Download failed."
+      return 1
+    fi
+  fi
+
+  local scores=()
+  local usages=()
+  local raw_reports=""
+  local run_count=3
+  
+  # 初始化頻率極值
+  local global_freq_min=999999
+  local global_freq_max=0
+
+  # --- 3. 循環測試 (3次) ---
+  for (( i=1; i<=run_count; i++ )); do
+    echo ""
+    printf "$t_round_start\n" "$i"
+    echo -e "$t_running"
+    "$TEMP_WORKDIR/7zz" b | tee "$TEMP_WORKDIR/7z_output.txt"
+    local output
+    output=$(cat "$TEMP_WORKDIR/7z_output.txt")
+
+    local block
+    block=$(echo "$output" | sed -n '/Freq (MHz):/,$p')
+    if [ -z "$block" ]; then block=$(echo "$output" | sed -n '/RAM size/,$p'); fi
+    raw_reports+="\n**Round $i:**\n\`\`\`\n$block\n\`\`\`\n"
+
+    local mips
+    mips=$(echo "$output" | grep "Tot:" | awk '{print $NF}')
+    scores+=("$mips")
+      
+    local usage_val
+    usage_val=$(echo "$output" | grep "Tot:" | awk '{print $2}')
+    usages+=("$usage_val")
+
+    # 3.4 頻率全採樣
+    local freq_line_raw
+    freq_line_raw=$(echo "$output" | grep "1T CPU Freq (MHz):" | head -n 1 | sed 's/1T CPU Freq (MHz)://g')
+      
+    for f_val in $freq_line_raw; do
+      if [[ "$f_val" =~ ^[0-9]+$ ]]; then
+        if [ "$f_val" -lt "$global_freq_min" ]; then global_freq_min=$f_val; fi
+        if [ "$f_val" -gt "$global_freq_max" ]; then global_freq_max=$f_val; fi
+      fi
+    done
+
+    if [ "$i" -lt "$run_count" ]; then
+      echo ""
+      echo -e "${YELLOW}$t_cooldown${RESET}"
+      for (( s=30; s>0; s-- )); do
+        printf "\rWaiting... %2d s" "$s"
+        sleep 1
+      done
+      printf "\rWaiting... Done! \n"
+    fi
+  done
+
+  # --- 4. 數據統計 ---
+
+  local sum=0
+  local min=${scores[0]}
+  local max=${scores[0]}
+  
+  for s in "${scores[@]}"; do
+      sum=$(echo "$sum + $s" | bc)
+      if (( s < min )); then min=$s; fi
+      if (( s > max )); then max=$s; fi
+  done
+  local avg=$(echo "$sum / $run_count" | bc)
+  local jitter=$(echo "scale=3; ($max - $min) / $avg" | bc | awk '{printf "%.3f", $0}')
+
+  # 4.2 頻率範圍 (使用 awk 四捨五入)
+  local final_freq_display="N/A"
+  
+  if [ "$global_freq_max" -gt 0 ] && [ "$global_freq_min" -lt 999999 ]; then
+      # 【修正點 2】改用 awk 進行除法以獲得四捨五入 (例如 2.286 -> 2.29)
+      local min_ghz
+      min_ghz=$(awk -v mhz="$global_freq_min" 'BEGIN {printf "%.2f", mhz/1000}')
+      local max_ghz
+      max_ghz=$(awk -v mhz="$global_freq_max" 'BEGIN {printf "%.2f", mhz/1000}')
+      
+      if [ "$min_ghz" == "$max_ghz" ]; then
+          final_freq_display="${min_ghz} GHz"
+      else
+          final_freq_display="${min_ghz} - ${max_ghz} GHz"
+      fi
+  else
+      local sys_mhz
+      sys_mhz=$(lscpu | grep "MHz" | head -n 1 | awk '{print $NF}')
+      if [ -n "$sys_mhz" ]; then
+           final_freq_display=$(awk -v mhz="$sys_mhz" 'BEGIN {printf "%.2f GHz (Sys)", mhz/1000}')
+      fi
+  fi
+
+  # 4.3 參考範圍
+  local usage_sum=0
+  for u in "${usages[@]}"; do
+      usage_sum=$(echo "$usage_sum + $u" | bc)
+  done
+  local usage_avg=$(echo "$usage_sum / $run_count" | bc)
+  
+  # 公式: 平均利用率 * 35 和 * 60
+  local ref_low=$(echo "$usage_avg * 35" | bc)
+  local ref_high=$(echo "$usage_avg * 60" | bc)
+  local ref_range="${ref_low} - ${ref_high}"
+
+  local core_count
+  core_count=$(nproc)
+
+  # --- 5. 生成報告 ---
+  
+  local scores_str="${scores[*]}"
+  local analysis_summary
+  analysis_summary="$t_freq: $final_freq_display | $t_cores: $core_count\n"
+  analysis_summary+="$t_scores: ${scores_str// /, }\n"
+  analysis_summary+="$t_avg: **$avg** | $t_jitter: **$jitter** $t_jitter_desc\n"
+  analysis_summary+="$t_ref: $ref_range\n"
+  analysis_summary+="$t_ref_desc"
+
+  {
+    echo "" 
+    echo "$t_title"
+    echo -e "$raw_reports"
+    echo ""
+    echo -e "$analysis_summary"
+  } >> "$report"
+
+  # --- 6. 終端顯示 ---
+  echo ""
+  printf "$t_final_output\n" "$avg" "$jitter" "$final_freq_display"
+)
+
 ip_quality() {
   # --- 設定 ---
   local RESULT_DIR="$HOME/result"
@@ -2235,9 +2462,10 @@ else
   fi
   
   if $do_oversell; then
-    cpu_test
-    cpu_oversell_test
-    disk_test
+    #cpu_test
+    #cpu_oversell_test
+    #disk_test
+    seven_zip_test
   fi
 
   if $do_ip; then
