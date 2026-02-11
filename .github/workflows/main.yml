@@ -91,8 +91,6 @@ jobs:
       - name: Call custom AI API
         if: env.changed_ngsh == 'true' && env.skip_whole_workflow != 'true' && env.skip_ai == 'false'
         run: |
-          diff_json=$(jq -Rs . <<< "$diff_text")
-
           json_payload=$(jq -n \
             --arg system_msg "請用繁體中文，根據以下 diff 寫出 changelog 條列，不要開場白、不要說明文字、也不要提到版本更新，也不要提到 diff，僅條列變更項目，簡短扼要。條列時請使用 - 作為項目前綴符號。" \
             --arg user_msg "$diff_text" \
@@ -104,10 +102,14 @@ jobs:
               ]
             }')
 
-          curl -s -X POST https://models.github.ai/inference/chat/completions \
-            -H "Authorization: Bearer $GITHUB_TOKEN" \
+          curl -s -X POST -f https://models.github.ai/inference/chat/completions \
+            -H "Authorization: Bearer $AI_API_TOKEN" \
             -H "Content-Type: application/json" \
             -d "$json_payload" > response.json
+
+          echo "===== API raw response ====="
+          cat response.json
+          echo "============================"
 
           summary=$(jq -r '.choices[0].message.content // "AI 回傳空結果"' response.json)
 
