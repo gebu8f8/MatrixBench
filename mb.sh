@@ -35,7 +35,7 @@ YELLOW='\033[1;33m'  # ⚠️ 警告用黃色
 CYAN="\033[1;36m"    # ℹ️ 一般提示用青色
 RESET='\033[0m'      # 清除顏色
 
-version="v2026.01.22"
+version="v2026.02.11"
 
 handle_error() {
     local exit_code=$?
@@ -164,7 +164,14 @@ check_app(){
   else
     pkg_script="util-linux"
   fi
-
+  if [ $system -eq 2 ]; then
+    pkg_convert="ImageMagick"
+    pkg_cyclictest="realtime-tests"
+  else
+    pkg_convert="imagemagick"
+    pkg_cyclictest="rt-tests"
+  fi
+    
   # 定義指令與套件對應關係
   declare -A pkg_map=(
     ["sar"]="sysstat"
@@ -174,12 +181,10 @@ check_app(){
     ["fc-list"]="fontconfig"
     ["script"]="$pkg_script"
     ["aha"]="aha"
-    ["pngquant"]="pngquant"
     ["bc"]="bc"
-    ["cyclictest"]="rt-tests"
+    ["cyclictest"]="$pkg_cyclictest"
     ["sysbench"]="sysbench"
-    ["convert"]="imagemagick"
-    ["ioping"]="ioping"
+    ["convert"]="$pkg_convert"
   )
   if [ $system == 2 ]; then
     if ! yum repolist enabled | grep -q "epel"; then
@@ -1146,6 +1151,23 @@ cpu_oversell_test() {
 disk_test() {
   local report="$HOME/result/hardware.txt"
   
+  if ! command -v ioping >/dev/null 2>&1; then
+    if [ $system -eq 1 ]; then
+      apt install ioping -y
+    elif [ $system -eq 2 ]; then
+      if ! dnf install ioping -y; then
+        local version=$( . /etc/os-release; echo "${VERSION_ID%%.*}" )
+        local SYS_ARCH=$(uname -m)
+        [ $SYS_ARCH == aarch64 ] && return 0
+        local ioping_rpm=$(curl -sL "https://dl.fedoraproject.org/pub/epel/$version/Everything/x86_64/Packages/i/" | grep -oP 'ioping-[^"]+\.x86_64\.rpm'| head -n1)
+        dnf install -y https://dl.fedoraproject.org/pub/epel/$version/Everything/x86_64/Packages/i/$ioping_rpm
+      fi
+    fi
+  fi
+  if ! command -v ioping >/dev/null 2>&1; then
+    return 0
+  fi
+  
   # --- 多語言定義 ---
   case "$lang" in
   cn)
@@ -1639,6 +1661,93 @@ net_quality() {
     --window-size=2000,10000 \
     file://$TEMP_HTML >/dev/null 2>&1
   mogrify -trim $FINAL_IMAGE_FILE >/dev/null 2>&1
+}
+bgp_tool() {
+  local RESULT="$HOME/result/bgp.txt"
+  # 定義圖片檔案路徑
+  local FILE_V4="$HOME/result/bgp_ipv4.png"
+  local FILE_V6="$HOME/result/bgp_ipv6.png"
+  local TOOL_PATH="$TEMP_WORKDIR/bgp"
+  
+  # 確保結果目錄存在
+  mkdir -p "$HOME/result"
+
+  # 1. 多語言文字定義
+  case "$lang" in
+    cn)
+      local t_title="## BGP 路由可视化"
+      local t_v4_title="### IPv4 路由可视化"
+      local t_v6_title="### IPv6 路由可视化"
+      ;;
+    us)
+      local t_title="## BGP Route Visualization"
+      local t_v4_title="### IPv4 Route Visualization"
+      local t_v6_title="### IPv6 Route Visualization"
+      ;;
+    *)
+      local t_title="## BGP 路由可視化"
+      local t_v4_title="### IPv4 路由可視化"
+      local t_v6_title="### IPv6 路由可視化"
+      ;;
+  esac
+
+  # 2. 下載並執行 Go 工具
+  wget -qO "$TOOL_PATH" https://files.gebu8f.com/files/net_tool
+  chmod +x "$TOOL_PATH"
+  
+  # 執行工具 (它會輸出 bash 陣列字串 或 exit 2)
+  local BGP_OUTPUT
+  BGP_OUTPUT=$("$TOOL_PATH")
+  local EXIT_CODE=$?
+
+  # 3. 狀態碼處理
+  if [ $EXIT_CODE -eq 2 ]; then
+    # 之前跑過 (鎖定中)，直接跳過
+    return 0
+  elif [ $EXIT_CODE -ne 0 ]; then
+    # 發生未知錯誤
+    return 1
+  fi
+  eval "local BGP_ARRAY=$BGP_OUTPUT"
+
+  for prefix in "${BGP_ARRAY[@]}"; do
+    local TARGET_FILE=""
+
+    # [關鍵] 判斷是 IPv4 還是 IPv6，並指定不同的輸出檔案
+    if [[ "$prefix" == *":"* ]]; then
+        TARGET_FILE="$FILE_V6"
+    else
+        TARGET_FILE="$FILE_V4"
+    fi
+
+    $chromium_comm --headless --no-sandbox --disable-gpu \
+      --screenshot="$TARGET_FILE" \
+      --window-size=2000,10000 \
+      "https://bgp.tools/pathimg/rt-$prefix?217425ba-014e-4d48-9d94-24cd803cdc69&loggedin&showrs" >/dev/null 2>&1
+    # 修剪圖片空白
+    if [ -f "$TARGET_FILE" ]; then
+      mogrify -trim "$TARGET_FILE" >/dev/null 2>&1
+    fi
+  done
+  if [ -f "$FILE_V4" ] || [ -f "$FILE_V6" ]; then
+      echo "" >> "$RESULT"
+      echo "$t_title" >> "$RESULT"
+      echo "" >> "$RESULT"
+  fi
+
+  # 檢查 IPv4
+  if [ -f "$FILE_V4" ]; then
+      echo "$t_v4_title" >> "$RESULT"
+      echo "![bgp_ipv4](bgp_ipv4.png)" >> "$RESULT"
+      echo "" >> "$RESULT"
+  fi
+
+  # 檢查 IPv6
+  if [ -f "$FILE_V6" ]; then
+      echo "$t_v6_title" >> "$RESULT"
+      echo "![bgp_ipv6](bgp_ipv6.png)" >> "$RESULT"
+      echo "" >> "$RESULT"
+  fi
 }
 net_rounting() {
   if [[ "$lang" != cn ]]; then
@@ -2241,6 +2350,7 @@ all_report() {
   echo "[IMG 1]" >> $report
   cat $RESULT_DIR/hardware.txt >> $report
   echo "$t_ip_quality" >> $report
+  [ -f $RESULT_DIR/bgp.txt ] && cat $RESULT_DIR/bgp.txt >> $report
   echo "[IMG 2]" >> $report
   echo "$t_net_quality" >> $report
   echo "[IMG 3]" >> $report 
@@ -2440,6 +2550,7 @@ if $run_all; then
   disk_test
   seven_zip_test
   ip_quality
+  bgp_tool
   net_quality
   net_rounting
   streaming_unlock
@@ -2475,6 +2586,7 @@ else
   fi
 
   if $do_nq; then
+    bgp_tool
     net_quality
   fi
 
