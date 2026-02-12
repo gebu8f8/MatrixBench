@@ -104,7 +104,7 @@ jobs:
             }')
 
           curl -s -X POST -w "\nHTTP_STATUS:%{http_code}\n" https://models.github.ai/inference/chat/completions \
-            -H "Authorization: Bearer $AI_API_TOKEN" \
+            -H "Authorization: Bearer $GITHUB_TOKEN" \
             -H "Content-Type: application/json" \
             -d "$json_payload" > response.json
 
@@ -118,7 +118,7 @@ jobs:
           echo "$summary" >> $GITHUB_ENV
           echo "EOF" >> $GITHUB_ENV
         env:
-          AI_API_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
       - name: Show Release Note
         if: env.changed_ngsh == 'true' && env.skip_whole_workflow != 'true'
