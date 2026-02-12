@@ -74,11 +74,11 @@ jobs:
           git fetch origin main
 
           if git rev-parse HEAD~1 >/dev/null 2>&1; then
-            if git diff --quiet HEAD~1 HEAD -- fw.sh; then
-              echo "diff_text=(未變更 fw.sh)" >> $GITHUB_ENV
+            if git diff --quiet HEAD~1 HEAD -- mb.sh; then
+              echo "diff_text=(未變更 mb.sh)" >> $GITHUB_ENV
               echo "skip_ai=true" >> $GITHUB_ENV
             else
-              diff_text=$(git diff HEAD~1 HEAD -- fw.sh | grep -vE '^[+-]version=')
+              diff_text=$(git diff HEAD~1 HEAD -- mb.sh | grep -vE '^[+-]version=')
               echo "diff_text<<EOF" >> $GITHUB_ENV
               echo "$diff_text" >> $GITHUB_ENV
               echo "EOF" >> $GITHUB_ENV
