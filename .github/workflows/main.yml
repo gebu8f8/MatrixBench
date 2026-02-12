@@ -8,14 +8,16 @@ on:
 jobs:
   release_note:
     runs-on: ubuntu-latest
-    
+
+    env:
+      AI_API_URL: ${{ secrets.AI_API_URL }}
     steps:
       - name: Checkout repo
         uses: actions/checkout@v4
         with:
           fetch-depth: 0
 
-      - name: Check if mb.sh was modified in this push
+      - name: Check if fw.sh was modified in this push
         id: check_ngsh_commit
         run: |
              if git rev-parse HEAD~1 >/dev/null 2>&1; then
@@ -34,7 +36,7 @@ jobs:
                  echo "首次 commit 包含 mb.sh"
                else
                 echo "changed_ngsh=false" >> $GITHUB_ENV
-                echo "首次 commit 未包含 docker_mgr.sh，後續流程將跳過"
+                echo "首次 commit 未包含 mb.sh，後續流程將跳過"
                fi
              fi
 
@@ -72,11 +74,11 @@ jobs:
           git fetch origin main
 
           if git rev-parse HEAD~1 >/dev/null 2>&1; then
-            if git diff --quiet HEAD~1 HEAD -- mb.sh; then
-              echo "diff_text=(未變更 mb.sh)" >> $GITHUB_ENV
+            if git diff --quiet HEAD~1 HEAD -- fw.sh; then
+              echo "diff_text=(未變更 fw.sh)" >> $GITHUB_ENV
               echo "skip_ai=true" >> $GITHUB_ENV
             else
-              diff_text=$(git diff HEAD~1 HEAD -- mb.sh | grep -vE '^[+-]version=')
+              diff_text=$(git diff HEAD~1 HEAD -- fw.sh | grep -vE '^[+-]version=')
               echo "diff_text<<EOF" >> $GITHUB_ENV
               echo "$diff_text" >> $GITHUB_ENV
               echo "EOF" >> $GITHUB_ENV
@@ -91,26 +93,23 @@ jobs:
       - name: Call custom AI API
         if: env.changed_ngsh == 'true' && env.skip_whole_workflow != 'true' && env.skip_ai == 'false'
         run: |
-          echo "diff length: ${#diff_text}"
+          diff_json=$(jq -Rs . <<< "$diff_text")
+
           json_payload=$(jq -n \
             --arg system_msg "請用繁體中文，根據以下 diff 寫出 changelog 條列，不要開場白、不要說明文字、也不要提到版本更新，也不要提到 diff，僅條列變更項目，簡短扼要。條列時請使用 - 作為項目前綴符號。" \
             --arg user_msg "$diff_text" \
             '{
-              model: "deepseek/DeepSeek-V3-0324",
+              model:"deepseek/DeepSeek-V3-0324",
               messages: [
                 {"role": "system", "content": $system_msg},
                 {"role": "user", "content": $user_msg}
               ]
             }')
 
-          curl -s -X POST  https://models.github.ai/inference/chat/completions \
+          curl -s -X POST https://models.github.ai/inference/chat/completions \
             -H "Authorization: Bearer $GITHUB_TOKEN" \
             -H "Content-Type: application/json" \
             -d "$json_payload" > response.json
-
-          echo "===== API raw response ====="
-          cat response.json
-          echo "============================"
 
           summary=$(jq -r '.choices[0].message.content // "AI 回傳空結果"' response.json)
 
