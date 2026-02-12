@@ -35,7 +35,7 @@ YELLOW='\033[1;33m'  # ⚠️ 警告用黃色
 CYAN="\033[1;36m"    # ℹ️ 一般提示用青色
 RESET='\033[0m'      # 清除顏色
 
-version="v2026.02.12"
+version="v2026.02.11"
 
 handle_error() {
     local exit_code=$?
@@ -1321,9 +1321,8 @@ $file_grade
 EOF
 }
 
-seven_zip_test() {
+seven_zip_test() (
   local report="$HOME/result/hardware.txt"
-  
   # --- 1. 定義語言字串 ---
   case "$lang" in
     cn)
@@ -1336,9 +1335,7 @@ seven_zip_test() {
       local t_running="${CYAN}正在运行 7-Zip 基准测试 (多线程模式)...${RESET}"
       local t_freq="CPU 频率 (全核心实测范围)"
       local t_cores="核心数"
-      local t_scores="三次评分 (总分 MIPS)"
-      local t_comp_score="压缩评分 (三次 MIPS)"
-      local t_decomp_score="解压评分 (三次 MIPS)"
+      local t_scores="三次评分"
       local t_avg="平均分"
       local t_jitter="差异倍率 (抖动)"
       local t_jitter_desc="(数值越小越稳定)"
@@ -1356,9 +1353,7 @@ seven_zip_test() {
       local t_running="${CYAN}Running 7-Zip Benchmark (Multi-threading)...${RESET}"
       local t_freq="CPU Freq (Measured Range)"
       local t_cores="Cores"
-      local t_scores="Run Scores (Total MIPS)"
-      local t_comp_score="Compression Scores (MIPS)"
-      local t_decomp_score="Decompression Scores (MIPS)"
+      local t_scores="Run Scores"
       local t_avg="Average Score"
       local t_jitter="Deviation Ratio"
       local t_jitter_desc="(Lower is better)"
@@ -1376,9 +1371,7 @@ seven_zip_test() {
       local t_running="${CYAN}正在執行 7-Zip 基準測試 (多線程模式)...${RESET}"
       local t_freq="CPU 頻率 (全核心實測範圍)"
       local t_cores="核心數"
-      local t_scores="三次評分 (總分 MIPS)"
-      local t_comp_score="壓縮評分 (三次 MIPS)"
-      local t_decomp_score="解壓評分 (三次 MIPS)"
+      local t_scores="三次評分"
       local t_avg="平均分"
       local t_jitter="差異倍率 (抖動)"
       local t_jitter_desc="(數值越小越穩定)"
@@ -1396,13 +1389,19 @@ seven_zip_test() {
   fi
 
   # --- 2. 準備環境與動態下載 ---
-  mkdir -p "$TEMP_WORKDIR"
+  cd "$TEMP_WORKDIR" || exit 1
 
-  if [ ! -f "$TEMP_WORKDIR/7zz" ]; then
+  if [ ! -f "7zz" ]; then
     echo -e "$t_check_ver"
     local latest_tag=$(curl -sL -o /dev/null -w %{url_effective} https://github.com/ip7z/7zip/releases/latest | awk -F'/' '{print $NF}')
-    local ver_num=$(echo "$latest_tag" | tr -d '.')
-    local arch=$(uname -m)
+      
+    # 去除點 (25.01 -> 2501)
+    local ver_num
+    ver_num=$(echo "$latest_tag" | tr -d '.')
+      
+    # 架構檢測
+    local arch
+      arch=$(uname -m)
     local os_type="linux-x64"
     if [[ "$arch" == "aarch64" || "$arch" == "arm64" ]]; then
       os_type="linux-arm64"
@@ -1411,31 +1410,22 @@ seven_zip_test() {
     local download_url="https://github.com/ip7z/7zip/releases/download/${latest_tag}/7z${ver_num}-${os_type}.tar.xz"
       
     printf "$t_installing\n" "$latest_tag ($arch)"
-    
-    (
-      cd "$TEMP_WORKDIR" || exit 1
-      wget -qO 7z_latest.tar.xz "$download_url"
-      if [ $? -eq 0 ]; then
-        tar -xf 7z_latest.tar.xz
-        chmod +x 7zz
-      else
-        exit 1
-      fi
-    )
-    if [ $? -ne 0 ]; then
+    wget -qO 7z_latest.tar.xz "$download_url"
+    if [ $? -eq 0 ]; then
+      tar -xf 7z_latest.tar.xz
+      chmod +x 7zz
+    else
       echo "Error: Download failed."
       return 1
     fi
   fi
 
-  local scores=()        # 總分 (Tot Rating)
-  local usages=()        # 總使用率 (Tot Usage)
-  local comp_scores=()   # 壓縮評分 (Comp Rating)
-  local decomp_scores=() # 解壓評分 (Decomp Rating)
-  
+  local scores=()
+  local usages=()
   local raw_reports=""
   local run_count=3
   
+  # 初始化頻率極值
   local global_freq_min=999999
   local global_freq_max=0
 
@@ -1444,12 +1434,7 @@ seven_zip_test() {
     echo ""
     printf "$t_round_start\n" "$i"
     echo -e "$t_running"
-    
-    (
-      cd "$TEMP_WORKDIR" || exit 1
-      ./7zz b | tee "7z_output.txt"
-    )
-    
+    "$TEMP_WORKDIR/7zz" b | tee "$TEMP_WORKDIR/7z_output.txt"
     local output
     output=$(cat "$TEMP_WORKDIR/7z_output.txt")
 
@@ -1458,22 +1443,13 @@ seven_zip_test() {
     if [ -z "$block" ]; then block=$(echo "$output" | sed -n '/RAM size/,$p'); fi
     raw_reports+="\n**Round $i:**\n\`\`\`\n$block\n\`\`\`\n"
 
-    # --- 數據抓取 ---
     local mips
-    mips=$(echo "$output" | grep "^Tot:" | awk '{print $NF}')
+    mips=$(echo "$output" | grep "Tot:" | awk '{print $NF}')
     scores+=("$mips")
       
     local usage_val
-    usage_val=$(echo "$output" | grep "^Tot:" | awk '{print $(NF-2)}')
+    usage_val=$(echo "$output" | grep "Tot:" | awk '{print $2}')
     usages+=("$usage_val")
-
-    local comp_val
-    comp_val=$(echo "$output" | grep "^Avr:" | awk '{print $5}')
-    comp_scores+=("$comp_val")
-
-    local decomp_val
-    decomp_val=$(echo "$output" | grep "^Avr:" | awk '{print $NF}')
-    decomp_scores+=("$decomp_val")
 
     # 3.4 頻率全採樣
     local freq_line_raw
@@ -1508,13 +1484,14 @@ seven_zip_test() {
       if (( s < min )); then min=$s; fi
       if (( s > max )); then max=$s; fi
   done
-
   local avg=$(echo "$sum / $run_count" | bc)
   local jitter=$(echo "scale=3; ($max - $min) / $avg" | bc | awk '{printf "%.3f", $0}')
 
-  # 4.2 頻率範圍
+  # 4.2 頻率範圍 (使用 awk 四捨五入)
   local final_freq_display="N/A"
+  
   if [ "$global_freq_max" -gt 0 ] && [ "$global_freq_min" -lt 999999 ]; then
+      # 【修正點 2】改用 awk 進行除法以獲得四捨五入 (例如 2.286 -> 2.29)
       local min_ghz
       min_ghz=$(awk -v mhz="$global_freq_min" 'BEGIN {printf "%.2f", mhz/1000}')
       local max_ghz
@@ -1540,6 +1517,7 @@ seven_zip_test() {
   done
   local usage_avg=$(echo "$usage_sum / $run_count" | bc)
   
+  # 公式: 平均利用率 * 35 和 * 60
   local ref_low=$(echo "$usage_avg * 35" | bc)
   local ref_high=$(echo "$usage_avg * 60" | bc)
   local ref_range="${ref_low} - ${ref_high}"
@@ -1547,20 +1525,13 @@ seven_zip_test() {
   local core_count
   core_count=$(nproc)
 
-  # --- 5. 生成報告 (包含三次壓縮與解壓) ---
+  # --- 5. 生成報告 ---
   
   local scores_str="${scores[*]}"
-  local comp_str="${comp_scores[*]}"
-  local decomp_str="${decomp_scores[*]}"
-
   local analysis_summary
   analysis_summary="$t_freq: $final_freq_display | $t_cores: $core_count\n"
   analysis_summary+="$t_scores: ${scores_str// /, }\n"
   analysis_summary+="$t_avg: **$avg** | $t_jitter: **$jitter** $t_jitter_desc\n"
-  
-  analysis_summary+="- **$t_comp_score**: ${comp_str// /, }\n"
-  analysis_summary+="- **$t_decomp_score**: ${decomp_str// /, }\n"
-  
   analysis_summary+="$t_ref: $ref_range\n"
   analysis_summary+="$t_ref_desc"
 
@@ -1572,14 +1543,11 @@ seven_zip_test() {
     echo -e "$analysis_summary"
   } >> "$report"
 
-  # --- 6. 終端顯示 (新增壓縮與解壓詳情) ---
+  # --- 6. 終端顯示 ---
   echo ""
-  # 使用 ${var// /, } 將空格轉為逗號，對齊報告格式
-  echo "${t_comp_score}: ${comp_str// /, }"
-  echo "${t_decomp_score}: ${decomp_str// /, }"
-  echo "------------------------------------------------"
   printf "$t_final_output\n" "$avg" "$jitter" "$final_freq_display"
-}
+)
+
 ip_quality() {
   # --- 設定 ---
   local RESULT_DIR="$HOME/result"
@@ -1707,19 +1675,19 @@ bgp_tool() {
   # 1. 多語言文字定義
   case "$lang" in
     cn)
-      local t_title="## BGP 路由图"
-      local t_v4_title="### IPv4"
-      local t_v6_title="### IPv6"
+      local t_title="## BGP 路由可视化"
+      local t_v4_title="### IPv4 路由可视化"
+      local t_v6_title="### IPv6 路由可视化"
       ;;
     us)
-      local t_title="## BGP Connectivity"
-      local t_v4_title="### IPv4"
-      local t_v6_title="### IPv6"
+      local t_title="## BGP Route Visualization"
+      local t_v4_title="### IPv4 Route Visualization"
+      local t_v6_title="### IPv6 Route Visualization"
       ;;
     *)
-      local t_title="## BGP 路由圖"
-      local t_v4_title="### IPv4"
-      local t_v6_title="### IPv6"
+      local t_title="## BGP 路由可視化"
+      local t_v4_title="### IPv4 路由可視化"
+      local t_v6_title="### IPv6 路由可視化"
       ;;
   esac
 
@@ -2364,13 +2332,13 @@ all_report() {
       local t_basic="## 基礎信息"
       local t_ip_quality="## IP質量"
       local t_net_quality="## 網路質量"
-      local t_streaming="## 串流媒體"
+      local t_streaming="## 流媒體"
       local t_stability="## 穩定性測試"
       local t_img1="第一個基礎信息圖片對應到："
       local t_img2="第二個IP質量圖片對應到："
       local t_img3="第三個網路質量圖片對應到："
       local t_img4="第四個路由追蹤圖片對應到："
-      local t_img5="第五個串流媒體圖片對應到："
+      local t_img5="第五個流媒體圖片對應到："
       local t_img4_alt="第四個流媒體圖片對應到："
       local t_report_summary="報告總合在："
       local t_batch_reports="分批報告內容在:"
@@ -2382,8 +2350,8 @@ all_report() {
   echo "[IMG 1]" >> $report
   cat $RESULT_DIR/hardware.txt >> $report
   echo "$t_ip_quality" >> $report
-  echo "[IMG 2]" >> $report
   [ -f $RESULT_DIR/bgp.txt ] && cat $RESULT_DIR/bgp.txt >> $report
+  echo "[IMG 2]" >> $report
   echo "$t_net_quality" >> $report
   echo "[IMG 3]" >> $report 
   if [ "$lang" == "cn" ]; then
