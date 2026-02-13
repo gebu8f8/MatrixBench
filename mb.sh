@@ -35,7 +35,7 @@ YELLOW='\033[1;33m'  # ⚠️ 警告用黃色
 CYAN="\033[1;36m"    # ℹ️ 一般提示用青色
 RESET='\033[0m'      # 清除顏色
 
-version="v2026.02.12"
+version="v2026.02.13"
 
 handle_error() {
     local exit_code=$?
@@ -1580,120 +1580,6 @@ seven_zip_test() {
   echo "------------------------------------------------"
   printf "$t_final_output\n" "$avg" "$jitter" "$final_freq_display"
 }
-ip_quality() {
-  # --- 設定 ---
-  local RESULT_DIR="$HOME/result"
-  local OFFICIAL_ANSI_OUTPUT="$TEMP_WORKDIR/ip.ansi"
-  local TEMP_SVG="$TEMP_WORKDIR/temp_report.svg"
-  local FINAL_IMAGE_FILE="${RESULT_DIR}/IP.png"
-
-  echo -e "${CYAN}$ip_quality_1...${RESET}"
-  case $lang in
-  us)
-    ipcecek='-l en'
-  esac
-  
-  bash <(curl -Ls https://IP.Check.Place) $ipcecek -y -p -o $OFFICIAL_ANSI_OUTPUT >/dev/null 2>&1
-  cat $OFFICIAL_ANSI_OUTPUT
-  
-  sed -i 's/\r//g; /^$/d' "$OFFICIAL_ANSI_OUTPUT"
-  wget -qO $TEMP_WORKDIR/ansi https://files.gebu8f.com/files/ansi
-  chmod +x $TEMP_WORKDIR/ansi 
-  $TEMP_WORKDIR/ansi $OFFICIAL_ANSI_OUTPUT $TEMP_SVG >/dev/null
-  $chromium_comm --headless --no-sandbox --disable-gpu \
-    --screenshot=$FINAL_IMAGE_FILE \
-    --window-size=2000,10000 \
-    file://$TEMP_SVG >/dev/null 2>&1
-  mogrify -trim $FINAL_IMAGE_FILE >/dev/null 2>&1
-}
-
-net_quality() {
-  # --- 設定 ---
-  local RESULT_DIR="$HOME/result"
-  local OFFICIAL_ANSI_OUTPUT="$TEMP_WORKDIR/net.ansi"
-  local TEMP_HTML="$TEMP_WORKDIR/temp_net_report.html"
-  local FINAL_IMAGE_FILE="${RESULT_DIR}/net.png"
-
-  echo -e "${CYAN}$net_quality_1...${RESET}"
-  
-  declare -A pkg_map=(
-    ["stun"]="stun-client"
-    ["mtr"]="mtr"
-    ["iperf3"]="iperf3"
-  )
-  # 逐一檢查並安裝
-  for cmd in "${!pkg_map[@]}"; do
-    if ! command -v "$cmd" >/dev/null 2>&1; then
-      pkg="${pkg_map[$cmd]}"
-      case "$system" in
-      1) 
-        export DEBIAN_FRONTEND=noninteractive
-        apt update -qq && apt install -y "$pkg"
-        ;;
-      2) yum install -y "$pkg" ;;
-      esac
-    fi
-  done
-  case $lang in
-  us)
-    netcecek='-l en'
-  esac
-
-  bash <(curl -Ls https://Net.Check.Place) $netcecek -p -y -o $OFFICIAL_ANSI_OUTPUT >/dev/null 2>&1
-  cat $OFFICIAL_ANSI_OUTPUT
-  
-  sed -i 's/\r//g; /^$/d' "$OFFICIAL_ANSI_OUTPUT"
-
-  aha --title "$net_quality_2" < "$OFFICIAL_ANSI_OUTPUT" > "$TEMP_HTML"
-  
-  sed -i '/<head>/a \
-  <style type="text/css"> \
-    body { \
-      background-color: #181a1f !important; \
-      font-family: "Noto Sans CJK SC", "Noto Sans CJK TC", "Noto Sans", "Noto Sans Mono", "Noto Color Emoji", "DejaVu Sans Mono", "Courier New", monospace; \
-      padding: 25px; \
-      color: #cfcfcf; \
-    } \
-    pre { \
-      color: #cfcfcf; \
-      white-space: pre-wrap; \
-      word-wrap: break-word; \
-      font-size: 14px; \
-      line-height: 1.45; \
-      letter-spacing: 0.2px; \
-    } \
-    \
-    span[style*="color:red"] { color: #ff5555 !important; text-shadow: 0 0 3px #7f2222; } \
-    span[style*="color:green"] { color: #586e44 !important; font-weight: bold !important; text-shadow: 0 0 3px #203314; } \
-    span[style*="color:yellow"] { color: #f1fa8c !important; text-shadow: 0 0 3px #7a751e; } \
-    span[style*="color:blue"] { color: #61afef !important; text-shadow: 0 0 3px #234a7a; } \
-    span[style*="color:cyan"] { color: #8be9fd !important; text-shadow: 0 0 3px #236b7a; } \
-    span[style*="color:magenta"], span[style*="color:purple"] { color: #bd93f9 !important; text-shadow: 0 0 3px #4a2a7a; } \
-    span[style*="color:gray"], span[style*="color:dimgray"] { color: #9e9e9e !important; } \
-    span[style*="color:white"] { color: #e6e6e6 !important; } \
-    span[style*="color:olive"]{ color: #f1fa8c !important; } \
-    span[style*="color:teal"] { color: #3c4d47 !important; font-weight: bold !important; } \
-    \
-    span[style*="background-color:red"] { background-color: #8b0000 !important; color: #fff !important; } \
-    span[style*="background-color:green"] { background-color: #586e44 !important; color: #fff !important; } \
-    span[style*="background-color:blue"] { background-color: #1149c5 !important; color: #fff !important; } \
-    span[style*="background-color:cyan"] { background-color: #004b4b !important; color: #fff !important; } \
-    span[style*="background-color:yellow"] { background-color: #7a6e00 !important; color: #fff !important; } \
-    span[style*="background-color:purple"], span[style*="background-color:magenta"] { background-color: #1149c3 !important; color: #fff !important; } \
-    span[style*="background-color:olive"] { background-color: #e8751d !important; color: #ffffff !important; } \
-    \
-    span[style*="text-decoration:underline"] { \
-      text-decoration-thickness: 2px !important; \
-      text-underline-offset: 2px !important; \
-      text-decoration-color: currentColor !important; \
-    } \
-  <\/style>' "$TEMP_HTML"
-  $chromium_comm --headless --no-sandbox --disable-gpu \
-    --screenshot=$FINAL_IMAGE_FILE\
-    --window-size=2000,10000 \
-    file://$TEMP_HTML >/dev/null 2>&1
-  mogrify -trim $FINAL_IMAGE_FILE >/dev/null 2>&1
-}
 bgp_tool() {
   local RESULT="$HOME/result/bgp.txt"
   # 定義圖片檔案路徑
@@ -1781,6 +1667,80 @@ bgp_tool() {
       echo "" >> "$RESULT"
   fi
 }
+
+ip_quality() {
+  # --- 設定 ---
+  local RESULT_DIR="$HOME/result"
+  local OFFICIAL_ANSI_OUTPUT="$TEMP_WORKDIR/ip.ansi"
+  local TEMP_SVG="$TEMP_WORKDIR/temp_report.svg"
+  local FINAL_IMAGE_FILE="${RESULT_DIR}/IP.png"
+
+  echo -e "${CYAN}$ip_quality_1...${RESET}"
+  case $lang in
+  us)
+    ipcecek='-l en'
+  esac
+  
+  bash <(curl -Ls https://IP.Check.Place) $ipcecek -y -p -o $OFFICIAL_ANSI_OUTPUT >/dev/null 2>&1
+  cat $OFFICIAL_ANSI_OUTPUT
+  
+  sed -i 's/\r//g; /^$/d' "$OFFICIAL_ANSI_OUTPUT"
+  wget -qO $TEMP_WORKDIR/ansi https://files.gebu8f.com/files/ansi
+  chmod +x $TEMP_WORKDIR/ansi 
+  $TEMP_WORKDIR/ansi -ip $OFFICIAL_ANSI_OUTPUT $TEMP_SVG >/dev/null
+  $chromium_comm --headless --no-sandbox --disable-gpu \
+    --screenshot=$FINAL_IMAGE_FILE \
+    --window-size=2000,10000 \
+    file://$TEMP_SVG >/dev/null 2>&1
+  mogrify -trim $FINAL_IMAGE_FILE >/dev/null 2>&1
+}
+
+net_quality() {
+  # --- 設定 ---
+  local RESULT_DIR="$HOME/result"
+  local OFFICIAL_ANSI_OUTPUT="$TEMP_WORKDIR/net.ansi"
+  local TEMP_HTML="$TEMP_WORKDIR/temp_net_report.svg"
+  local FINAL_IMAGE_FILE="${RESULT_DIR}/net.png"
+
+  echo -e "${CYAN}$net_quality_1...${RESET}"
+  
+  declare -A pkg_map=(
+    ["stun"]="stun-client"
+    ["mtr"]="mtr"
+    ["iperf3"]="iperf3"
+  )
+  # 逐一檢查並安裝
+  for cmd in "${!pkg_map[@]}"; do
+    if ! command -v "$cmd" >/dev/null 2>&1; then
+      pkg="${pkg_map[$cmd]}"
+      case "$system" in
+      1) 
+        export DEBIAN_FRONTEND=noninteractive
+        apt update -qq && apt install -y "$pkg"
+        ;;
+      2) yum install -y "$pkg" ;;
+      esac
+    fi
+  done
+  case $lang in
+  us)
+    netcecek='-l en'
+  esac
+
+  bash <(curl -Ls https://Net.Check.Place) $netcecek -p -y -o $OFFICIAL_ANSI_OUTPUT >/dev/null 2>&1
+  cat $OFFICIAL_ANSI_OUTPUT
+  
+  sed -i 's/\r//g; /^$/d' "$OFFICIAL_ANSI_OUTPUT"
+  
+  wget -qO $TEMP_WORKDIR/ansi https://files.gebu8f.com/files/ansi
+  chmod +x $TEMP_WORKDIR/ansi 
+  $TEMP_WORKDIR/ansi -nq $OFFICIAL_ANSI_OUTPUT $TEMP_SVG >/dev/null
+  $chromium_comm --headless --no-sandbox --disable-gpu \
+    --screenshot=$FINAL_IMAGE_FILE\
+    --window-size=2000,10000 \
+    file://$TEMP_HTML >/dev/null 2>&1
+  mogrify -trim $FINAL_IMAGE_FILE >/dev/null 2>&1
+}
 net_rounting() {
   if [[ "$lang" != cn ]]; then
     return 0
@@ -1807,7 +1767,7 @@ net_rounting() {
   # --- 設定 ---
   local RESULT_DIR="$HOME/result"
   local OFFICIAL_ANSI_OUTPUT="$TEMP_WORKDIR/rounting.ansi"
-  local TEMP_HTML="$TEMP_WORKDIR/rounting.html"
+  local TEMP_HTML="$TEMP_WORKDIR/rounting.svg"
   local FINAL_IMAGE_FILE="${RESULT_DIR}/CN_rounting.png"
 
   echo -e "${CYAN}开始执行路由追踪检测（需10-20分钟）${RESET}"
@@ -1817,63 +1777,14 @@ net_rounting() {
   bash <(curl -Ls https://Net.Check.Place) -R -p -y -o $OFFICIAL_ANSI_OUTPUT >/dev/null 2>&1
   cat $OFFICIAL_ANSI_OUTPUT
   
-  sed -i 's/\r//g; /^$/d' "$OFFICIAL_ANSI_OUTPUT"
-
-  aha --title "路由追踪报告" < "$OFFICIAL_ANSI_OUTPUT" > "$TEMP_HTML"
-  
-  sed -i '/<head>/a \
-  <style type="text/css"> \
-    body { \
-      background-color: #181a1f !important; \
-      font-family: "Noto Sans CJK SC", "Noto Sans CJK TC", "Noto Sans", "Noto Sans Mono", "Noto Color Emoji", "DejaVu Sans Mono", "Courier New", monospace; \
-      padding: 25px; \
-      color: #cfcfcf; \
-      letter-spacing: 0 !important; \
-      word-spacing: 0 !important; \
-    } \
-    pre { \
-      color: #cfcfcf; \
-      white-space: pre-wrap; \
-      word-wrap: break-word; \
-      font-size: 14px; \
-      line-height: 1.45; \
-      letter-spacing: 0.2px; \
-    } \
-    \
-    span[style*="color:red"] { color: #ff5555 !important; text-shadow: 0 0 3px #7f2222; } \
-    span[style*="color:green"] { color: #586e44 !important; font-weight: bold !important; text-shadow: 0 0 3px #203314; } \
-    span[style*="color:yellow"] { color: #f1fa8c !important; text-shadow: 0 0 3px #7a751e; } \
-    span[style*="color:blue"] { color: #61afef !important; text-shadow: 0 0 3px #234a7a; } \
-    span[style*="color:cyan"] { color: #8be9fd !important; text-shadow: 0 0 3px #236b7a; } \
-    span[style*="color:magenta"], span[style*="color:purple"] { color: #bd93f9 !important; text-shadow: 0 0 3px #4a2a7a; } \
-    span[style*="color:gray"], span[style*="color:dimgray"] { color: #9e9e9e !important; } \
-    span[style*="color:white"] { color: #e6e6e6 !important; } \
-    span[style*="color:olive"]{ color: #f1fa8c !important; text-shadow: 0 0 3px #7a751e; } \
-    span[style*="color:teal"] { color: #3c4d47 !important; font-weight: bold !important; } \
-    \
-    span[style*="background-color:red"] { background-color: #8b0000 !important; color: #fff !important; } \
-    span[style*="background-color:green"] { background-color: #586e44 !important; color: #fff !important; } \
-    span[style*="background-color:blue"] { background-color: #1149c5 !important; color: #fff !important; } \
-    span[style*="background-color:cyan"] { background-color: #004b4b !important; color: #fff !important; } \
-    span[style*="background-color:yellow"] { background-color: #7a6e00 !important; color: #fff !important; } \
-    span[style*="background-color:purple"], span[style*="background-color:magenta"] { background-color: #4b006e !important; color: #fff !important; } \
-    \
-    span[style*="background-color:gray"], span[style*="background-color:dimgray"] { background-color: #5c6370 !important; color: #ffffff !important; } \
-    span[style*="background-color:teal"] { background-color: #004b4b !important; color: #ffffff !important; } \
-    span[style*="background-color:olive"] { background-color: #e8751d !important; color: #ffffff !important; } \
-    \
-    span[style*="text-decoration:underline"] { \
-      text-decoration-thickness: 2px !important; \
-      text-underline-offset: 2px !important; \
-      text-decoration-color: currentColor !important; \
-    } \
-  <\/style>' "$TEMP_HTML"
-  
+  wget -qO $TEMP_WORKDIR/ansi https://files.gebu8f.com/files/ansi
+  chmod +x $TEMP_WORKDIR/ansi 
+  $TEMP_WORKDIR/ansi -nr $OFFICIAL_ANSI_OUTPUT $TEMP_SVG >/dev/null
   $chromium_comm --headless --no-sandbox --disable-gpu \
     --screenshot=$FINAL_IMAGE_FILE\
     --window-size=2000,10000 \
     file://$TEMP_HTML >/dev/null 2>&1
-  mogrify -trim $FINAL_IMAGE_FILE $HOME/result
+  mogrify -trim $FINAL_IMAGE_FILE >/dev/null 2>&1
 }
 streaming_unlock() {
   local RAW_ANSI_OUTPUT="${TEMP_WORKDIR}/streaming_report.ansi"
