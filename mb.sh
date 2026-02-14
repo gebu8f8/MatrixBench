@@ -35,7 +35,7 @@ YELLOW='\033[1;33m'  # ⚠️ 警告用黃色
 CYAN="\033[1;36m"    # ℹ️ 一般提示用青色
 RESET='\033[0m'      # 清除顏色
 
-version="v2026.02.13"
+version="v2026.02.14"
 
 handle_error() {
     local exit_code=$?
@@ -157,84 +157,96 @@ check_system(){
 }
 
 check_app(){
-  local is_app_install=false
-  # 根據系統選擇 script 對應套件
+  local install_list=""
+  local need_fc_cache=false
+  local pkg_script="util-linux"
+  local pkg_convert="imagemagick"
+  local pkg_cyclictest="rt-tests"
+  
   if [ "$system" -eq 1 ]; then
     pkg_script="bsdutils"
-  else
-    pkg_script="util-linux"
-  fi
-  if [ $system -eq 2 ]; then
+  else # RHEL/CentOS
     pkg_convert="ImageMagick"
     pkg_cyclictest="realtime-tests"
-  else
-    pkg_convert="imagemagick"
-    pkg_cyclictest="rt-tests"
   fi
     
-  # 定義指令與套件對應關係
   declare -A pkg_map=(
-    ["sar"]="sysstat"
-    ["curl"]="curl"
-    ["jq"]="jq"
-    ["unzip"]="unzip"
-    ["fc-list"]="fontconfig"
-    ["script"]="$pkg_script"
-    ["aha"]="aha"
-    ["bc"]="bc"
-    ["cyclictest"]="$pkg_cyclictest"
-    ["sysbench"]="sysbench"
+    ["sar"]="sysstat" ["curl"]="curl" ["jq"]="jq" ["unzip"]="unzip"
+    ["fc-list"]="fontconfig" ["script"]="$pkg_script" ["aha"]="aha"
+    ["bc"]="bc" ["cyclictest"]="$pkg_cyclictest" ["sysbench"]="sysbench"
     ["convert"]="$pkg_convert"
   )
-  if [ $system == 2 ]; then
-    if ! yum repolist enabled | grep -q "epel"; then
-      yum install -y epel-release
-    fi
+
+  # 1. EPEL 檢查
+  if [ "$system" -eq 2 ] && [ ! -f /etc/yum.repos.d/epel.repo ]; then
+    yum install -y epel-release
   fi
+
+  # 2. 檢查二進制工具
   for cmd in "${!pkg_map[@]}"; do
     if ! command -v "$cmd" >/dev/null 2>&1; then
-      is_app_install=true
-    fi
-  done
-  if $is_app_install; then
-    if ! curl -s --connect-timeout 3 https://api64.ipify.org >/dev/null; then
-      echo -e "${RED}您的網路不通，請稍後再試（Your network is down, please try again later）${RESET}"
-      exit 1
-    fi
-  fi
-  # 逐一檢查並安裝
-  for cmd in "${!pkg_map[@]}"; do
-    if ! command -v "$cmd" >/dev/null 2>&1; then
-      pkg="${pkg_map[$cmd]}"
-      case "$system" in
-      1) apt update -qq && apt install -y "$pkg" ;;
-      2) yum install -y "$pkg" ;;
-      esac
+      install_list+=" ${pkg_map[$cmd]}"
     fi
   done
   
-  # --- Emoji 字體安裝 ---
-  if ! fc-list | grep -qi "NotoColorEmoji"; then
-    case $system in
-      1) apt install -y fonts-noto-color-emoji ;;
-      2)
-        yum install -y google-noto-emoji-color-fonts
-        ;;
-    esac
+  local installed_fonts=""
+  if command -v fc-list >/dev/null 2>&1; then
+      installed_fonts=$(fc-list : family)
   fi
-  if [ $lang != us ]; then
-    if ! fc-list | grep -qi "Noto Sans CJK"; then
+
+
+  if [[ ! "$installed_fonts" =~ "Noto Color Emoji" && ! "$installed_fonts" =~ "NotoColorEmoji" ]]; then
+    case $system in
+    1) install_list+=" fonts-noto-color-emoji" ;;
+    2) 
+      if ! rpm -q google-noto-color-emoji-fonts >/dev/null 2>&1; then
+        install_list+=" google-noto-color-emoji-fonts"
+      fi
+      ;;
+    esac
+    need_fc_cache=true
+  fi
+
+  # --- CJK 檢查修正 ---
+  if [ "$lang" != "us" ]; then
+    if [[ ! "$installed_fonts" =~ "Noto Sans CJK" ]]; then
       case $system in
       1)
-        apt update -y
-        apt install -y fonts-noto-cjk fonts-noto-mono
+        install_list+=" fonts-noto-cjk fonts-noto-mono"
         ;;
       2)
-        yum install -y google-noto-sans-cjk-ttc-fonts google-noto-sans-mono-fonts || yum install -y google-noto-cjk-fonts google-noto-sans-fonts
+        # 檢查 rpm 避免重複
+        if ! rpm -q google-noto-sans-cjk-ttc-fonts >/dev/null 2>&1; then
+          install_list+=" google-noto-sans-cjk-ttc-fonts google-noto-sans-mono-fonts"
+        fi
         ;;
       esac
-      fc-cache -fv >/dev/null 2>&1
+      need_fc_cache=true
     fi
+  fi
+
+  if [ -n "$install_list" ]; then
+    install_list=$(echo $install_list | tr ' ' '\n' | sort -u | tr '\n' ' ')
+
+    if ! curl -s --connect-timeout 3 https://api64.ipify.org >/dev/null; then
+      echo -e "${RED}您的網路不通，請稍後再試${RESET}"
+      exit 1
+    fi
+    
+    case "$system" in
+    1) apt update && apt install -y $install_list ;;
+    2) 
+      if ! yum install -y $install_list; then
+        install_list=${install_list//google-noto-sans-cjk-ttc-fonts/google-noto-cjk-fonts}
+        yum install -y $install_list
+      fi
+      ;;
+    esac
+  fi
+
+  # 5. 刷新字體快取
+  if [ "$need_fc_cache" = true ]; then
+    fc-cache -fv >/dev/null 2>&1
   fi
 }
 
@@ -1681,8 +1693,7 @@ ip_quality() {
     ipcecek='-l en'
   esac
   
-  bash <(curl -Ls https://IP.Check.Place) $ipcecek -y -p -o $OFFICIAL_ANSI_OUTPUT >/dev/null 2>&1
-  cat $OFFICIAL_ANSI_OUTPUT
+  bash <(curl -Ls https://IP.Check.Place) $ipcecek -y -p -o $OFFICIAL_ANSI_OUTPUT
   
   sed -i 's/\r//g; /^$/d' "$OFFICIAL_ANSI_OUTPUT"
   wget -qO $TEMP_WORKDIR/ansi https://files.gebu8f.com/files/ansi
@@ -1699,37 +1710,17 @@ net_quality() {
   # --- 設定 ---
   local RESULT_DIR="$HOME/result"
   local OFFICIAL_ANSI_OUTPUT="$TEMP_WORKDIR/net.ansi"
-  local TEMP_HTML="$TEMP_WORKDIR/temp_net_report.svg"
+  local TEMP_SVG="$TEMP_WORKDIR/temp_net_report.svg"
   local FINAL_IMAGE_FILE="${RESULT_DIR}/net.png"
 
   echo -e "${CYAN}$net_quality_1...${RESET}"
-  
-  declare -A pkg_map=(
-    ["stun"]="stun-client"
-    ["mtr"]="mtr"
-    ["iperf3"]="iperf3"
-  )
-  # 逐一檢查並安裝
-  for cmd in "${!pkg_map[@]}"; do
-    if ! command -v "$cmd" >/dev/null 2>&1; then
-      pkg="${pkg_map[$cmd]}"
-      case "$system" in
-      1) 
-        export DEBIAN_FRONTEND=noninteractive
-        apt update -qq && apt install -y "$pkg"
-        ;;
-      2) yum install -y "$pkg" ;;
-      esac
-    fi
-  done
   case $lang in
   us)
     netcecek='-l en'
   esac
 
-  bash <(curl -Ls https://Net.Check.Place) $netcecek -p -y -o $OFFICIAL_ANSI_OUTPUT >/dev/null 2>&1
-  cat $OFFICIAL_ANSI_OUTPUT
-  
+  bash <(curl -Ls https://Net.Check.Place) $netcecek -p -y -o $OFFICIAL_ANSI_OUTPUT
+
   sed -i 's/\r//g; /^$/d' "$OFFICIAL_ANSI_OUTPUT"
   
   wget -qO $TEMP_WORKDIR/ansi https://files.gebu8f.com/files/ansi
@@ -1738,52 +1729,32 @@ net_quality() {
   $chromium_comm --headless --no-sandbox --disable-gpu \
     --screenshot=$FINAL_IMAGE_FILE\
     --window-size=2000,10000 \
-    file://$TEMP_HTML >/dev/null 2>&1
+    file://$TEMP_SVG >/dev/null 2>&1
   mogrify -trim $FINAL_IMAGE_FILE >/dev/null 2>&1
 }
 net_rounting() {
   if [[ "$lang" != cn ]]; then
     return 0
   fi
-  declare -A pkg_map=(
-    ["stun"]="stun-client"
-    ["convert"]="imagemagick"
-    ["mtr"]="mtr"
-    ["iperf3"]="iperf3"
-  )
-  # 逐一檢查並安裝
-  for cmd in "${!pkg_map[@]}"; do
-    if ! command -v "$cmd" >/dev/null 2>&1; then
-      pkg="${pkg_map[$cmd]}"
-      case "$system" in
-      1)
-        export DEBIAN_FRONTEND=noninteractive
-        apt update -qq && apt install -y "$pkg"
-        ;;
-      2) yum install -y "$pkg" ;;
-      esac
-    fi
-  done
   # --- 設定 ---
   local RESULT_DIR="$HOME/result"
   local OFFICIAL_ANSI_OUTPUT="$TEMP_WORKDIR/rounting.ansi"
-  local TEMP_HTML="$TEMP_WORKDIR/rounting.svg"
+  local TEMP_SVG="$TEMP_WORKDIR/rounting.svg"
   local FINAL_IMAGE_FILE="${RESULT_DIR}/CN_rounting.png"
 
   echo -e "${CYAN}开始执行路由追踪检测（需10-20分钟）${RESET}"
   
   mkdir -p "$RESULT_DIR"
   
-  bash <(curl -Ls https://Net.Check.Place) -R -p -y -o $OFFICIAL_ANSI_OUTPUT >/dev/null 2>&1
-  cat $OFFICIAL_ANSI_OUTPUT
-  
+  bash <(curl -Ls https://Net.Check.Place) -R -p -y -o $OFFICIAL_ANSI_OUTPUT
+
   wget -qO $TEMP_WORKDIR/ansi https://files.gebu8f.com/files/ansi
   chmod +x $TEMP_WORKDIR/ansi 
   $TEMP_WORKDIR/ansi -nr $OFFICIAL_ANSI_OUTPUT $TEMP_SVG >/dev/null
   $chromium_comm --headless --no-sandbox --disable-gpu \
     --screenshot=$FINAL_IMAGE_FILE\
     --window-size=2000,10000 \
-    file://$TEMP_HTML >/dev/null 2>&1
+    file://$TEMP_SVG >/dev/null 2>&1
   mogrify -trim $FINAL_IMAGE_FILE >/dev/null 2>&1
 }
 streaming_unlock() {
