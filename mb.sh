@@ -35,7 +35,7 @@ YELLOW='\033[1;33m'  # ⚠️ 警告用黃色
 CYAN="\033[1;36m"    # ℹ️ 一般提示用青色
 RESET='\033[0m'      # 清除顏色
 
-version="v2026.02.14"
+version="v2026.03.11"
 
 handle_error() {
     local exit_code=$?
@@ -178,8 +178,10 @@ check_app(){
   )
 
   # 1. EPEL 檢查
-  if [ "$system" -eq 2 ] && [ ! -f /etc/yum.repos.d/epel.repo ]; then
-    yum install -y epel-release
+  if [ "$system" -eq 2 ] && [ ! -f /etc/fedora-release ]; then
+    if [ ! -f /etc/yum.repos.d/epel.repo ]; then
+       dnf install -y epel-release
+    fi
   fi
 
   # 2. 檢查二進制工具
@@ -1346,6 +1348,7 @@ seven_zip_test() {
       local t_warm="警告: 系统非空闲 (当前CPU总使用率: %.0f%%)，测试结果可能不准。"
       local t_cooldown="正在冷却 CPU (休息 30 秒)..."
       local t_running="${CYAN}正在运行 7-Zip 基准测试 (多线程模式)...${RESET}"
+      local t_cpu_sig="CPU 代号 (Signature)"
       local t_freq="CPU 频率 (全核心实测范围)"
       local t_cores="核心数"
       local t_scores="三次评分 (总分 MIPS)"
@@ -1366,6 +1369,7 @@ seven_zip_test() {
       local t_warm="Warning: System busy (CPU Usage: %.0f%%), results may be inaccurate."
       local t_cooldown="Cooling down CPU (Resting 30s)..."
       local t_running="${CYAN}Running 7-Zip Benchmark (Multi-threading)...${RESET}"
+      local t_cpu_sig="CPU Signature"
       local t_freq="CPU Freq (Measured Range)"
       local t_cores="Cores"
       local t_scores="Run Scores (Total MIPS)"
@@ -1386,6 +1390,7 @@ seven_zip_test() {
       local t_warm="警告: 系統非空閒 (當前CPU總使用率: %.0f%%)，測試結果可能不準。"
       local t_cooldown="正在冷卻 CPU (休息 30 秒)..."
       local t_running="${CYAN}正在執行 7-Zip 基準測試 (多線程模式)...${RESET}"
+      local t_cpu_sig="CPU 代號 (Signature)"
       local t_freq="CPU 頻率 (全核心實測範圍)"
       local t_cores="核心數"
       local t_scores="三次評分 (總分 MIPS)"
@@ -1440,13 +1445,14 @@ seven_zip_test() {
     fi
   fi
 
-  local scores=()        # 總分 (Tot Rating)
-  local usages=()        # 總使用率 (Tot Usage)
-  local comp_scores=()   # 壓縮評分 (Comp Rating)
-  local decomp_scores=() # 解壓評分 (Decomp Rating)
+  local scores=()        # 總分
+  local usages=()        # 總使用率
+  local comp_scores=()   # 壓縮評分
+  local decomp_scores=() # 解壓評分
   
   local raw_reports=""
   local run_count=3
+  local captured_cpu_sig="Unknown"
   
   local global_freq_min=999999
   local global_freq_max=0
@@ -1465,31 +1471,31 @@ seven_zip_test() {
     local output
     output=$(cat "$TEMP_WORKDIR/7z_output.txt")
 
+    # 提取 CPU Signature (例如 800F12)
+    # 邏輯：搜尋括號內的 6 位十六進制代碼
+    local sig_tmp=$(echo "$output" | grep -oE "\([0-9A-F]{4,}\)" | head -n 1 | tr -d '()')
+    if [ -n "$sig_tmp" ]; then captured_cpu_sig="$sig_tmp"; fi
+
     local block
     block=$(echo "$output" | sed -n '/Freq (MHz):/,$p')
     if [ -z "$block" ]; then block=$(echo "$output" | sed -n '/RAM size/,$p'); fi
     raw_reports+="\n**Round $i:**\n\`\`\`\n$block\n\`\`\`\n"
 
     # --- 數據抓取 ---
-    local mips
-    mips=$(echo "$output" | grep "^Tot:" | awk '{print $NF}')
+    local mips=$(echo "$output" | grep "^Tot:" | awk '{print $NF}')
     scores+=("$mips")
       
-    local usage_val
-    usage_val=$(echo "$output" | grep "^Tot:" | awk '{print $(NF-2)}')
+    local usage_val=$(echo "$output" | grep "^Tot:" | awk '{print $(NF-2)}')
     usages+=("$usage_val")
 
-    local comp_val
-    comp_val=$(echo "$output" | grep "^Avr:" | awk '{print $5}')
+    local comp_val=$(echo "$output" | grep "^Avr:" | awk '{print $5}')
     comp_scores+=("$comp_val")
 
-    local decomp_val
-    decomp_val=$(echo "$output" | grep "^Avr:" | awk '{print $NF}')
+    local decomp_val=$(echo "$output" | grep "^Avr:" | awk '{print $NF}')
     decomp_scores+=("$decomp_val")
 
     # 3.4 頻率全採樣
-    local freq_line_raw
-    freq_line_raw=$(echo "$output" | grep "1T CPU Freq (MHz):" | head -n 1 | sed 's/1T CPU Freq (MHz)://g')
+    local freq_line_raw=$(echo "$output" | grep "1T CPU Freq (MHz):" | head -n 1 | sed 's/1T CPU Freq (MHz)://g')
       
     for f_val in $freq_line_raw; do
       if [[ "$f_val" =~ ^[0-9]+$ ]]; then
@@ -1510,11 +1516,9 @@ seven_zip_test() {
   done
 
   # --- 4. 數據統計 ---
-
   local sum=0
   local min=${scores[0]}
   local max=${scores[0]}
-  
   for s in "${scores[@]}"; do
       sum=$(echo "$sum + $s" | bc)
       if (( s < min )); then min=$s; fi
@@ -1527,53 +1531,34 @@ seven_zip_test() {
   # 4.2 頻率範圍
   local final_freq_display="N/A"
   if [ "$global_freq_max" -gt 0 ] && [ "$global_freq_min" -lt 999999 ]; then
-      local min_ghz
-      min_ghz=$(awk -v mhz="$global_freq_min" 'BEGIN {printf "%.2f", mhz/1000}')
-      local max_ghz
-      max_ghz=$(awk -v mhz="$global_freq_max" 'BEGIN {printf "%.2f", mhz/1000}')
-      
-      if [ "$min_ghz" == "$max_ghz" ]; then
-          final_freq_display="${min_ghz} GHz"
-      else
-          final_freq_display="${min_ghz} - ${max_ghz} GHz"
-      fi
-  else
-      local sys_mhz
-      sys_mhz=$(lscpu | grep "MHz" | head -n 1 | awk '{print $NF}')
-      if [ -n "$sys_mhz" ]; then
-           final_freq_display=$(awk -v mhz="$sys_mhz" 'BEGIN {printf "%.2f GHz (Sys)", mhz/1000}')
-      fi
+      local min_ghz=$(awk -v mhz="$global_freq_min" 'BEGIN {printf "%.2f", mhz/1000}')
+      local max_ghz=$(awk -v mhz="$global_freq_max" 'BEGIN {printf "%.2f", mhz/1000}')
+      final_freq_display="${min_ghz} - ${max_ghz} GHz"
+      if [ "$min_ghz" == "$max_ghz" ]; then final_freq_display="${min_ghz} GHz"; fi
   fi
 
   # 4.3 參考範圍
   local usage_sum=0
-  for u in "${usages[@]}"; do
-      usage_sum=$(echo "$usage_sum + $u" | bc)
-  done
+  for u in "${usages[@]}"; do usage_sum=$(echo "$usage_sum + $u" | bc); done
   local usage_avg=$(echo "$usage_sum / $run_count" | bc)
-  
   local ref_low=$(echo "$usage_avg * 35" | bc)
   local ref_high=$(echo "$usage_avg * 60" | bc)
-  local ref_range="${ref_low} - ${ref_high}"
 
-  local core_count
-  core_count=$(nproc)
+  local core_count=$(nproc)
 
-  # --- 5. 生成報告 (包含三次壓縮與解壓) ---
-  
+  # --- 5. 生成報告 ---
   local scores_str="${scores[*]}"
   local comp_str="${comp_scores[*]}"
   local decomp_str="${decomp_scores[*]}"
 
   local analysis_summary
-  analysis_summary="$t_freq: $final_freq_display | $t_cores: $core_count\n"
+  analysis_summary="$t_cpu_sig: **$captured_cpu_sig**\n"
+  analysis_summary+="$t_freq: $final_freq_display | $t_cores: $core_count\n"
   analysis_summary+="$t_scores: ${scores_str// /, }\n"
   analysis_summary+="$t_avg: **$avg** | $t_jitter: **$jitter** $t_jitter_desc\n"
-  
   analysis_summary+="- **$t_comp_score**: ${comp_str// /, }\n"
   analysis_summary+="- **$t_decomp_score**: ${decomp_str// /, }\n"
-  
-  analysis_summary+="$t_ref: $ref_range\n"
+  analysis_summary+="$t_ref: ${ref_low} - ${ref_high}\n"
   analysis_summary+="$t_ref_desc"
 
   {
@@ -1584,9 +1569,9 @@ seven_zip_test() {
     echo -e "$analysis_summary"
   } >> "$report"
 
-  # --- 6. 終端顯示 (新增壓縮與解壓詳情) ---
+  # --- 6. 終端顯示 ---
   echo ""
-  # 使用 ${var// /, } 將空格轉為逗號，對齊報告格式
+  echo "${t_cpu_sig}: ${captured_cpu_sig}"
   echo "${t_comp_score}: ${comp_str// /, }"
   echo "${t_decomp_score}: ${decomp_str// /, }"
   echo "------------------------------------------------"
