@@ -35,7 +35,7 @@ YELLOW='\033[1;33m'  # ⚠️ 警告用黃色
 CYAN="\033[1;36m"    # ℹ️ 一般提示用青色
 RESET='\033[0m'      # 清除顏色
 
-version="v2026.03.11"
+version="v2026.05.07"
 
 handle_error() {
     local exit_code=$?
@@ -493,8 +493,10 @@ hardware_benchmarks() (
     echo ""
     if [ $gb == true ]; then
       echo "## $t_cpu_gb6"
-      echo "${t_single}：${gb6_single_score:-N/A}"
-      echo "${t_multi}：${gb6_multi_score:-N/A}"
+      if [[ -n "$gb6_multi_score" || -n "$gb6_single_score" ]]
+        echo "${t_single}：${gb6_single_score:-N/A}"
+        echo "${t_multi}：${gb6_multi_score:-N/A}"
+      fi
       echo "${t_gb_hint}：${gb6_url:-N/A}"
       echo ""
     fi
