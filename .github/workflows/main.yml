@@ -21,8 +21,8 @@ jobs:
         id: check_ngsh_commit
         run: |
              if git rev-parse HEAD~1 >/dev/null 2>&1; then
-              # 檢查 HEAD~1 → HEAD 是否變更 mb-test.sh
-              if git diff --name-only HEAD~1 HEAD | grep -q '^mb-test\.sh$'; then
+              # 檢查 HEAD~1 → HEAD 是否變更 mb_test.sh
+              if git diff --name-only HEAD~1 HEAD | grep -q '^mb_test\.sh$'; then
                echo "changed_ngsh=true" >> $GITHUB_ENV
                echo "本次 push 有修改 mb.sh"
               else
@@ -31,7 +31,7 @@ jobs:
               fi
              else
                 # 若 repo 僅有一個 commit
-               if git ls-tree --name-only HEAD | grep -q '^mb-test\.sh$'; then
+               if git ls-tree --name-only HEAD | grep -q '^mb_test\.sh$'; then
                  echo "changed_ngsh=true" >> $GITHUB_ENV
                  echo "首次 commit 包含 mb.sh"
                else
@@ -44,7 +44,7 @@ jobs:
         if: env.changed_ngsh == 'true'
         id: read_version
         run: |
-          raw_version=$(grep '^version=' mb-test.sh | cut -d'=' -f2 | tr -d '"' | tr -d "'")
+          raw_version=$(grep '^version=' mb_test.sh | cut -d'=' -f2 | tr -d '"' | tr -d "'")
           echo "抓到原始版本: $raw_version"
 
           if [[ "$raw_version" =~ ^v ]]; then
@@ -74,11 +74,11 @@ jobs:
           git fetch origin main
 
           if git rev-parse HEAD~1 >/dev/null 2>&1; then
-            if git diff --quiet HEAD~1 HEAD -- mb-test.sh; then
+            if git diff --quiet HEAD~1 HEAD -- mb_test.sh; then
               echo "diff_text=(未變更 mb.sh)" >> $GITHUB_ENV
               echo "skip_ai=true" >> $GITHUB_ENV
             else
-              diff_text=$(git diff HEAD~1 HEAD -- mb-test.sh | grep -vE '^[+-]version=')
+              diff_text=$(git diff HEAD~1 HEAD -- mb_test.sh | grep -vE '^[+-]version=')
               echo "diff_text<<EOF" >> $GITHUB_ENV
               echo "$diff_text" >> $GITHUB_ENV
               echo "EOF" >> $GITHUB_ENV
