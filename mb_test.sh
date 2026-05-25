@@ -35,7 +35,7 @@ YELLOW='\033[1;33m'  # ⚠️ 警告用黃色
 CYAN="\033[1;36m"    # ℹ️ 一般提示用青色
 RESET='\033[0m'      # 清除顏色
 
-version="v2026.05.07"
+version="v2026.05.25"
 
 handle_error() {
     local exit_code=$?
@@ -493,7 +493,7 @@ hardware_benchmarks() (
     echo ""
     if [ $gb == true ]; then
       echo "## $t_cpu_gb6"
-      if [[ -n "$gb6_multi_score" || -n "$gb6_single_score" ]]
+      if [[ -n "$gb6_multi_score" || -n "$gb6_single_score" ]]; then
         echo "${t_single}：${gb6_single_score:-N/A}"
         echo "${t_multi}：${gb6_multi_score:-N/A}"
       fi
@@ -1694,6 +1694,9 @@ ip_quality() {
 }
 
 net_quality() {
+  if [[ "$lang" != cn ]]; then
+    return 0
+  fi
   # --- 設定 ---
   local RESULT_DIR="$HOME/result"
   local OFFICIAL_ANSI_OUTPUT="$TEMP_WORKDIR/net.ansi"
@@ -2224,7 +2227,7 @@ all_report() {
       local t_img3="Third network quality image corresponds to:"
       local t_img4="Fourth route tracing image corresponds to:"
       local t_img5="Fifth streaming image corresponds to:"
-      local t_img4_alt="Fourth streaming image corresponds to:"
+      local t_img4_alt="Third streaming image corresponds to:"
       local t_report_summary="Summary report at:"
       local t_batch_reports="Batch report contents in:"
       local t_warning="Please remember to transfer to your device before copying text, otherwise it may be misaligned!"
@@ -2240,7 +2243,7 @@ all_report() {
       local t_img3="第三個網路質量圖片對應到："
       local t_img4="第四個路由追蹤圖片對應到："
       local t_img5="第五個串流媒體圖片對應到："
-      local t_img4_alt="第四個流媒體圖片對應到："
+      local t_img4_alt="第三個流媒體圖片對應到："
       local t_report_summary="報告總合在："
       local t_batch_reports="分批報告內容在:"
       local t_warning="請記得傳到您的裝置上再去複製文字，否則可能會錯位！"
@@ -2253,16 +2256,16 @@ all_report() {
   echo "$t_ip_quality" >> $report
   echo "[IMG 2]" >> $report
   [ -f $RESULT_DIR/bgp.txt ] && cat $RESULT_DIR/bgp.txt >> $report
-  echo "$t_net_quality" >> $report
-  echo "[IMG 3]" >> $report 
   if [ "$lang" == "cn" ]; then
+    echo "$t_net_quality" >> $report
+    echo "[IMG 3]" >> $report 
     echo "## 路由追踪" >> $report
     echo "[IMG 4]" >> $report 
     echo "$t_streaming" >> $report
     echo "[IMG 5]" >> $report
   else
     echo "$t_streaming" >> $report
-    echo "[IMG 4]" >> $report
+    echo "[IMG 3]" >> $report
   fi
   [ -f $RESULT_DIR/global_net.txt ] && cat "$RESULT_DIR/global_net.txt" >> $report
   cat "$RESULT_DIR"/ping.txt >> $report
@@ -2272,8 +2275,8 @@ all_report() {
   }
   echo "$t_img1$RESULT_DIR/base.png"
   echo "$t_img2$RESULT_DIR/IP.png"
-  echo "$t_img3$RESULT_DIR/net.png"
   if [[ "$lang" == cn ]]; then
+    echo "$t_img3$RESULT_DIR/net.png"
     echo "$t_img4$RESULT_DIR/CN_rounting.png"
     echo "$t_img5$RESULT_DIR/streaming.png"
   else
