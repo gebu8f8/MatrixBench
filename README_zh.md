@@ -18,7 +18,7 @@
 執行以下指令即可開始全方位體檢。腳本會自動處理所需的依賴安裝。
 
 ```bash
-bash <(curl -sL https://mb.gebu8f.com)
+bash <(curl -sL https://page.gebu8f.page/sh/mb)
 ```
 > **注意:** 首次運行或伺服器環境極簡時，腳本會自動安裝必要的工具（如 `curl`, `jq` 等），這可能需要一些時間。**不支持僅IPV6**需至少有ipv4
 
