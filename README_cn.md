@@ -18,7 +18,7 @@
 执行以下指令即可开始全方位体检。脚本会自动处理所需的依赖安装。
 
 ```bash
-bash <(curl -sL https://mb.gebu8f.com) -l cn
+bash <(curl -sL https://page.gebu8f.page/sh/mb) -l cn
 ```
 > **注意:** 首次运行或伺服器环境极简时，脚本会自动安装必要的工具（如 `curl`, `jq`, `chromium` 等），这可能需要一些时间。 **不支持仅IPV6**需至少有ipv4
 
@@ -43,11 +43,11 @@ bash <(curl -sL https://mb.gebu8f.com) -l cn
 
 *   **只想快速检查 CPU 是否超售？**
 ```bash
-bash mb.sh -oversell
+bash <(curl -sL https://page.gebu8f.page/sh/mb) -oversell
 ```
 *   **想做一个全面的硬体和网络评测，但不关心流媒体？**
 ```bash
-bash mb.sh -hw -ip -nq -speedtest -ping
+bash <(curl -sL https://page.gebu8f.page/sh/mb) -hw -ip -nq -speedtest -ping
 ```
 *(你可以自由组合多个参数)*
 
@@ -69,10 +69,10 @@ bash mb.sh -hw -ip -nq -speedtest -ping
 为了方便使用，你可以执行以下指令，将 `MatrixBench` 安装为一个全域的 `mb` 指令。这个指令会自动保持最新。
 
 ```bash
-bash <(curl -sL https://mb.gebu8f.com) --install
+bash <(curl -sL https://page.gebu8f.page/sh/mb) --install
 ```
 ## 详细内容及文章
-https://www.gebu8f.com/matrixbench/
+https://www.gebu8f.page/matrixbench/
 ## 🙏 致谢
 
 本专案的顺利开发，离不开以下优秀的开源专案和作者，在此表示诚挚的感谢。 `MatrixBench` 是在他们的基础之上，专注于提供更深层次的诊断分析。
