@@ -57,7 +57,7 @@ check_app(){
 }
 check_app
 
-curl -sL "https://le4-0-104-146gamut.pulsedmedia.com/public-gebu8f/bench_os.tar.xz" -o /tmp/bench_os.tar.xz 
+curl -sL "https://page.gebu8f.page/bench_os" -o /tmp/bench_os.tar.xz 
 tar -xJf /tmp/bench_os.tar.xz -C /srv/bench_os
 if [ -d "/srv/bench_os" ]; then
   rm -f /tmp/bench_os.tar.xz

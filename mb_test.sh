@@ -35,7 +35,7 @@ YELLOW='\033[1;33m'  # ⚠️ 警告用黃色
 CYAN="\033[1;36m"    # ℹ️ 一般提示用青色
 RESET='\033[0m'      # 清除顏色
 
-version="v2026.05.25"
+version="v2026.07.02"
 
 handle_error() {
     local exit_code=$?
@@ -1350,7 +1350,7 @@ seven_zip_test() {
       local t_warm="警告: 系统非空闲 (当前CPU总使用率: %.0f%%)，测试结果可能不准。"
       local t_cooldown="正在冷却 CPU (休息 30 秒)..."
       local t_running="${CYAN}正在运行 7-Zip 基准测试 (多线程模式)...${RESET}"
-      local t_cpu_sig="CPU 代号 (Signature)"
+      local t_cpu_sig="CPU 代号 (VPS用户不一定准确)"
       local t_freq="CPU 频率 (全核心实测范围)"
       local t_cores="核心数"
       local t_scores="三次评分 (总分 MIPS)"
@@ -1371,7 +1371,7 @@ seven_zip_test() {
       local t_warm="Warning: System busy (CPU Usage: %.0f%%), results may be inaccurate."
       local t_cooldown="Cooling down CPU (Resting 30s)..."
       local t_running="${CYAN}Running 7-Zip Benchmark (Multi-threading)...${RESET}"
-      local t_cpu_sig="CPU Signature"
+      local t_cpu_sig="CPU Signature（VPS users aren't always accurate）"
       local t_freq="CPU Freq (Measured Range)"
       local t_cores="Cores"
       local t_scores="Run Scores (Total MIPS)"
@@ -1392,7 +1392,7 @@ seven_zip_test() {
       local t_warm="警告: 系統非空閒 (當前CPU總使用率: %.0f%%)，測試結果可能不準。"
       local t_cooldown="正在冷卻 CPU (休息 30 秒)..."
       local t_running="${CYAN}正在執行 7-Zip 基準測試 (多線程模式)...${RESET}"
-      local t_cpu_sig="CPU 代號 (Signature)"
+      local t_cpu_sig="CPU 代號（VPS用戶不一定準確）"
       local t_freq="CPU 頻率 (全核心實測範圍)"
       local t_cores="核心數"
       local t_scores="三次評分 (總分 MIPS)"
@@ -1609,7 +1609,7 @@ bgp_tool() {
   esac
 
   # 2. 下載並執行 Go 工具
-  wget -qO "$TOOL_PATH" https://files.gebu8f.com/files/net_tool
+  wget -qO "$TOOL_PATH" https://files.gebu8f.page/files/net_tool
   chmod +x "$TOOL_PATH"
   
   # 執行工具 (它會輸出 bash 陣列字串 或 exit 2)
@@ -1683,7 +1683,7 @@ ip_quality() {
   bash <(curl -Ls https://IP.Check.Place) $ipcecek -y -p -o $OFFICIAL_ANSI_OUTPUT
   
   sed -i 's/\r//g; /^$/d' "$OFFICIAL_ANSI_OUTPUT"
-  wget -qO $TEMP_WORKDIR/ansi https://files.gebu8f.com/files/ansi
+  wget -qO $TEMP_WORKDIR/ansi https://files.gebu8f.page/files/ansi
   chmod +x $TEMP_WORKDIR/ansi 
   $TEMP_WORKDIR/ansi -ip $OFFICIAL_ANSI_OUTPUT $TEMP_SVG >/dev/null
   $chromium_comm --headless --no-sandbox --disable-gpu \
@@ -1713,7 +1713,7 @@ net_quality() {
 
   sed -i 's/\r//g; /^$/d' "$OFFICIAL_ANSI_OUTPUT"
   
-  wget -qO $TEMP_WORKDIR/ansi https://files.gebu8f.com/files/ansi
+  wget -qO $TEMP_WORKDIR/ansi https://files.gebu8f.page/files/ansi
   chmod +x $TEMP_WORKDIR/ansi 
   $TEMP_WORKDIR/ansi -nq $OFFICIAL_ANSI_OUTPUT $TEMP_SVG >/dev/null
   $chromium_comm --headless --no-sandbox --disable-gpu \
@@ -1738,7 +1738,7 @@ net_rounting() {
   
   bash <(curl -Ls https://Net.Check.Place) -R -p -y -o $OFFICIAL_ANSI_OUTPUT
 
-  wget -qO $TEMP_WORKDIR/ansi https://files.gebu8f.com/files/ansi
+  wget -qO $TEMP_WORKDIR/ansi https://files.gebu8f.page/files/ansi
   chmod +x $TEMP_WORKDIR/ansi 
   $TEMP_WORKDIR/ansi -nr $OFFICIAL_ANSI_OUTPUT $TEMP_SVG >/dev/null
   $chromium_comm --headless --no-sandbox --disable-gpu \
@@ -2322,6 +2322,7 @@ check_app
 create_folder
 # --- Flag 初始化 ---
 do_hw=false
+do_7zip=false
 do_ip=false
 do_nq=false
 do_nr=false
@@ -2369,6 +2370,11 @@ while [[ $# -gt 0 ]]; do
       ;;
     -oversell)
       do_oversell=true
+      run_all=false
+      shift
+      ;;
+    -7zip)
+      do_7zip=true
       run_all=false
       shift
       ;;
@@ -2433,7 +2439,7 @@ if $run_all || $do_hw || $do_ip || $do_nq || $do_nr || $do_stream; then
     chromium_comm="chromium-browser"
   fi
 fi
-if $do_hw || $run_all; then
+if $do_hw || $run_all || $do_7zip || $do_oversell; then
   if ! curl -s --connect-timeout 3 https://api4.ipify.org >/dev/null; then
     echo -e "${RED}您的網路不通，請稍後再試（Your network is down, please try again later）${RESET}"
     exit 1
@@ -2463,11 +2469,22 @@ if $run_all; then
   aria2_test
   all_report
 else
-  if $do_hw && $do_oversell; then
-    [ $lang == us ] && echo -e "${RED}Error: The execution contents of two variables are duplicated, please select only one -hw or -oversell${RESET}"
-    [ $lang != us ] && echo -e "${RED}錯誤：兩個變量執行內容是重複的，請只選擇一個-hw或是-oversell${RESET}"
+  # 計算有多少個變量被啟用了（true 記為 1，空值或 false 記為 0）
+  selected_count=0
+  [ "$do_hw" = true ] && ((selected_count++))
+  [ "$do_oversell" = true ] && ((selected_count++))
+  [ "$do_7zip" = true ] && ((selected_count++))
+
+  # 如果啟用數量大於 1，就報錯
+  if [ $selected_count -gt 1 ]; then
+    if [ "$lang" = "us" ]; then
+      echo -e "${RED}Error: The execution contents of these variables are duplicated, please select only one: -hw, -oversell, or -7zip${RESET}"
+    else
+      echo -e "${RED}錯誤：多個變量執行內容重複，請只選擇一個：-hw、-oversell 或是 -7zip${RESET}"
+    fi
     exit 1
   fi
+  unset $selected_count
   if $do_hw; then
     ecs_download
     ecs_simple_static
@@ -2482,6 +2499,9 @@ else
     cpu_test
     cpu_oversell_test
     disk_test
+    seven_zip_test
+  fi
+  if $do_7zip; then
     seven_zip_test
   fi
 
