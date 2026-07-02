@@ -32,6 +32,7 @@ bash <(curl -sL https://page.gebu8f.page/sh/mb) -l cn
 |`-sgb`| 跳过Geekbench测试|
 | `-hw`| 运行所有硬体相关测试 (基础信息, 跑分, CPU拓扑, CPU 诚信度)|
 | `-oversell`| **运行独家的 CPU 诚信度与拓扑分析**|
+| `-7zip` | 运行7-zip测试 |
 | `-ip`| 运行 IP 质量检测|
 | `-nq`| 运行网络质量 (回程路由) 检测|
 | `-nr`| 运行中国三网络由测试|
