@@ -31,6 +31,7 @@ By default, MatrixBench performs a comprehensive analysis. Use the following opt
 |`-sgb`| Skip Geekbench Test|
 |`-hw`| **Full Hardware Audit:** Runs all hardware tests, including benchmarks, CPU topology, and our exclusive **CPU Honesty Test**.|
 |`-oversell`| **CPU Honesty Test:** Our exclusive test to see if you're getting the CPU you paid for. |
+| `-7zip` | Run 7-zip test |
 | `-ip`        | Performs an in-depth IP quality analysis.                   |
 | `-nq`        | Checks network quality and backhaul routing.                |
 | `-stream`    | Tests unblocking capabilities for major streaming services. |
@@ -41,15 +42,15 @@ By default, MatrixBench performs a comprehensive analysis. Use the following opt
 
 *   **To check for CPU overselling:**
     ```bash
-    bash <(curl...) -oversell
+    bash <(curl -sL https://page.gebu8f.page/sh/mb) -oversell
     ```
 *   **For a full hardware and network audit (excluding streaming tests):**
     ```bash
-    bash <(curl...) -hw -ip -nq -speedtest -ping
+    bash <(curl -sL https://page.gebu8f.page/sh/mb) -hw -ip -nq -speedtest -ping
     ```
 *   **To test only IP quality and streaming access:**
     ```bash
-    bash <(curl...) -ip -stream
+    bash <(curl -sL https://page.gebu8f.page/sh/mb) -ip -stream
     ```
 *(Options can be combined freely.)*
 
@@ -72,10 +73,10 @@ Upon completion, all generated reports—including images (`.png`) and text summ
 To run `MatrixBench` from anywhere, install it as a global `mb` command. It will automatically keep itself updated.
 
 ```bash
-bash <(curl -sL https://mb.gebu8f.com) --install
+bash <(curl -sL https://page.gebu8f.page/sh/mb) --install
 ```
 ## Detailed information and article (Traditional Chinese)
-https://www.gebu8f.com/matrixbench/
+https://www.gebu8f.page/matrixbench/
 ## 🙏 Acknowledgements
 
 MatrixBench stands on the shoulders of giants. We extend our sincere credit to the following projects and authors for their foundational work:
