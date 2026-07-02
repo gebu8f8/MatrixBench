@@ -32,6 +32,7 @@ bash <(curl -sL https://page.gebu8f.page/sh/mb)
 |`-sgb`| 跳過Geekbench測試|
 |`-hw`| 運行所有硬體相關測試 (基礎信息, 跑分, CPU拓撲, CPU 誠信度)|
 |`-oversell` | **運行獨家的 CPU 誠信度與拓撲分析**|
+| `-7zip` | 運行7-zip測試 |
 |`-ip`| 運行 IP 質量檢測|
 |`-nq`| 運行網路質量 (回程路由) 檢測|
 |`-stream`| 運行流媒體解鎖測試|
@@ -41,13 +42,13 @@ bash <(curl -sL https://page.gebu8f.page/sh/mb)
 
 ### 使用範例
 
-*   **只想快速檢查 CPU 是否超售？**
+*   **只想快速檢查 CPU 是否超賣？**
     ```bash
-    bash mb.sh -oversell
+    bash <(curl -sL https://page.gebu8f.page/sh/mb) -oversell
     ```
 *   **想做一個全面的硬體和網路評測，但不關心流媒體？**
     ```bash
-    bash mb.sh -hw -ip -speedtest -ping
+    bash <(curl -sL https://page.gebu8f.page/sh/mb) -hw -ip -speedtest -ping
     ```
     *(你可以自由組合多個參數)*
 
@@ -70,7 +71,7 @@ bash <(curl -sL https://page.gebu8f.page/sh/mb)
 為了方便使用，你可以執行以下指令，將 `MatrixBench` 安裝為一個全域的 `mb` 指令。這個指令會自動保持最新。
 
 ```bash
-bash <(curl -sL https://mb.gebu8f.com) --install
+bash <(curl -sL https://page.gebu8f.page/sh/mb) --install
 ```
 ## 詳細內容及文章
 https://www.gebu8f.com/matrixbench/
