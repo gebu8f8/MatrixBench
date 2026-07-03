@@ -35,7 +35,7 @@ YELLOW='\033[1;33m'  # ⚠️ 警告用黃色
 CYAN="\033[1;36m"    # ℹ️ 一般提示用青色
 RESET='\033[0m'      # 清除顏色
 
-version="v2026.07.02"
+version="v2026.07.03"
 
 handle_error() {
     local exit_code=$?
@@ -631,157 +631,66 @@ cpu_oversell_test() {
   case "$lang" in
   cn)
     local t_warm="系统非空闲 (当前CPU总使用率: %.0f%%)，测试结果可能不准。"
-    local t_title="## CPU 诚信度与压力测试"
-    local t_start="${CYAN}开始执行 CPU 诚信度与压力综合测试...${RESET}"
-    local t_params="[参数: 2轮静态分析 + 1轮压力分析]"
+    local t_title="## CPU 诚信度测试"
+    local t_start="${CYAN}开始执行 CPU 诚信度...${RESET}"
     local t_test_run="正在进行第 %d/2 次静态分析 (此过程约需 15 秒)..."
     local t_post_rest="${CYAN}第一次测试完成，30 秒冷却中...${RESET}"
-    local t_stress_start="${CYAN}静态分析完成，开始执行压力测试...${RESET}"
     local t_analysis="--- 最终分析结论 ---"
     local t_st_report="Steal Time (窃取时间) 峰值: %.2f%%"
     local t_st_count_report="Steal Time (窃取时间) 非零次数: %d/%d (%s%%)"
-    local t_lat_report="标准测试最大延迟 (Max Latency): %s µs"
-    local t_avg_report="平均延迟 (Average): %.1f µs"
-    local t_stress_report="压力测试峰值延迟 (Stress Peak): %d µs"
-    local t_grade_report="综合性能评级 (Score): %b"
-    local t_grade_reason="评级原因:"
-    local t_reason_steal_good="CPU 窃取时间极低 (%.2f%% < 1%%)"
-    local t_reason_steal_ok="CPU 窃取时间可接受 (%.2f%% < 3%%)"
-    local t_reason_steal_warn="CPU 窃取时间偏高 (%.2f%% < 5%%)"
-    local t_reason_steal_bad="CPU 窃取时间严重 (%.2f%% ≥ 5%%)"
-    
-    local t_reason_avg_exc="平均延迟优秀 (%.1f µs)"
-    local t_reason_avg_good="平均延迟良好 (%.1f µs)"
-    local t_reason_avg_ok="平均延迟偏高 (%.1f µs)"
-    local t_reason_avg_bad="平均延迟过高 (%.1f µs)"
-    
-    local t_reason_spike_isolated="极值为偶发尖刺 (Max/Avg = %.0fx)"
-    local t_reason_spike_frequent="高延迟较频繁 (Max/Avg = %.0fx)"
-    local t_reason_spike_systemic="存在系统性延迟问题"
-    
-    local t_reason_stability_good="多轮测试延迟稳定 (波动 ≤ 20%%)"
-    local t_reason_stability_ok="多轮测试有轻微波动 (波动 ≤ 50%%)"
-    local t_reason_stability_bad="多轮测试波动较大 (波动 > 50%%)"
-    
-    # 使用建議
-    local t_advice="适用场景:"
-    local t_advice_s="延迟敏感型应用（游戏服务器、实时通讯、高频交易）\n数据库服务器\n任何生产环境"
-
-    local t_advice_a="一般生产环境（Web 服务、API、应用服务器）\n数据库（非极端性能要求）\n延迟敏感应用（建议进行深入测试）"
-
-    local t_advice_b="通用型应用（网站、博客、开发测试）\n数据库（仅适用于轻量负载）\n不适用于延迟敏感应用"
-
-    local t_advice_c="轻量级应用（个人博客、静态网站）\n仅限开发或测试环境\n不适用于任何生产数据库\n不适用于延迟敏感应用"
-
-    local t_advice_f="不适合任何生产环境\n仅可用于离线任务或定时脚本"
-    
-    local t_stress_conclusion_low_impact="压力结论: 性能卓越，高压下延迟增幅可控 (%.1fx)"
-    local t_stress_conclusion_high_impact="压力结论: 性能稳定，高压下延迟增加显著但未失控 (%.1fx)"
-    local t_stress_conclusion_bottleneck="压力结论: 性能瓶颈，高压下延迟指数级增长 (%.1fx)"
-    local t_stress_params="[压力参数: %d个并发线程]"
-    local t_stress_conclusion_abnormal="压力结论: 性能反常，高压延迟低于标准延迟，可能存在 QoS 限制"
+    local t_sysbench_notice="${YELLOW}接下来将进行 sysbench CPU 测试，共 3 次，每次间隔 1 分钟休息，整体耗时较长，请耐心等候...${RESET}"
+    local t_sysbench_run="正在进行第 %d/%d 次 sysbench 测试..."
+    local t_sysbench_rest="${CYAN}本次测试完成，休息 1 分钟中...${RESET}"
+    local t_sysbench_title="### sysbench CPU 详细测试"
+    local t_sysbench_eps="每秒事件数（EPS）"
+    local t_sysbench_min="延迟最小值 (ms)"
+    local t_sysbench_avg="延迟平均值 (ms)"
+    local t_sysbench_max="延迟最大值 (ms)"
+    local t_sysbench_95th_percentile="95 百分位延时（P95） (ms)"
     ;;
   us)
     local t_warm="The system is not idle (current total CPU usage: %.0f%%), the test results may be inaccurate."
     local t_title="## CPU Honesty Test"
     local t_start="${CYAN}Starting CPU Honesty Test...${RESET}"
-    local t_params="[Parameters: 2 rounds of static analysis + 1 stress test]"
     local t_test_run="Running static analysis %d/2 (this takes about 15 seconds)..."
     local t_post_rest="${CYAN}First run complete, cooling down for 30 seconds...${RESET}"
-    local t_stress_start="${CYAN}Static analysis complete, starting stress test...${RESET}"
     local t_analysis="--- Final Analysis ---"
     local t_st_report="Peak Steal Time: %.2f%%"
     local t_st_count_report="Non-zero Steal Time Count: %d/%d (%s%%)"
-    local t_lat_report="Max Kernel Latency: %s µs"
-    local t_avg_report="Average Latency: %.1f µs"
-    local t_stress_report="Stress Peak: %d µs"
-    local t_grade_report="Overall Score: %b"
-    local t_grade_reason="Grade Reasons:"
-    
-    local t_reason_steal_good="CPU steal time is minimal (%.2f%% < 1%%)"
-    local t_reason_steal_ok="CPU steal time is acceptable (%.2f%% < 3%%)"
-    local t_reason_steal_warn="CPU steal time is elevated (%.2f%% < 5%%)"
-    local t_reason_steal_bad="CPU steal time is severe (%.2f%% ≥ 5%%)"
-    
-    local t_reason_avg_exc="Average latency is excellent (%.1f µs)"
-    local t_reason_avg_good="Average latency is good (%.1f µs)"
-    local t_reason_avg_ok="Average latency is elevated (%.1f µs)"
-    local t_reason_avg_bad="Average latency is excessive (%.1f µs)"
-    
-    local t_reason_spike_isolated="Max spikes are isolated events (Max/Avg = %.0fx)"
-    local t_reason_spike_frequent="High latency occurs frequently (Max/Avg = %.0fx)"
-    local t_reason_spike_systemic="Systemic latency issues detected"
-    
-    local t_reason_stability_good="Multi-round test shows stable performance (variation ≤ 20%%)"
-    local t_reason_stability_ok="Multi-round test shows minor variation (variation ≤ 50%%)"
-    local t_reason_stability_bad="Multi-round test shows significant variation (variation > 50%%)"
-    
-    local t_advice="Recommended use cases:"
-    local t_advice_s="Latency-sensitive applications such as game servers, real-time communication, and high-frequency trading\nDatabase servers\nAny production environment"
-    local t_advice_a="General production environments such as web services, APIs, and application servers\nDatabases with non-extreme performance requirements\nLatency-sensitive applications with additional testing recommended"
-    local t_advice_b="General purpose usage such as websites, blogs, and development or testing\nDatabases with light workloads only\nNot suitable for latency-sensitive applications"
-    local t_advice_c="Lightweight applications such as personal blogs and static websites\nDevelopment and testing environments only\nNot suitable for production databases\nNot suitable for latency-sensitive applications"
-    local t_advice_f="Not suitable for any production environment\nOnly suitable for offline tasks or scheduled scripts"
-    
-    local t_stress_conclusion_low_impact="Stress Result: Excellent performance, latency increase under load is controlled (%.1fx)"
-    local t_stress_conclusion_high_impact="Stress Result: Stable performance, latency increases significantly but remains controlled (%.1fx)"
-    local t_stress_conclusion_bottleneck="Stress Result: Performance bottleneck, latency increases exponentially under load (%.1fx)"
-    local t_stress_params="[Stress Parameters: %d concurrent threads]"
-    local t_stress_conclusion_abnormal="Stress Result: Abnormal behavior - stress latency lower than standard, possible QoS throttling"
+    local t_sysbench_notice="${YELLOW}Now running sysbench CPU test, 3 rounds with a 1-minute rest between each. This will take a while, please be patient...${RESET}"
+    local t_sysbench_run="Running sysbench test %d/%d..."
+    local t_sysbench_rest="${CYAN}This round complete, resting for 1 minute...${RESET}"
+    local t_sysbench_title="### Detailed sysbench CPU test"
+    local t_sysbench_eps="events per second"
+    local t_sysbench_min="Latency min (ms)"
+    local t_sysbench_avg="Latency avg (ms)"
+    local t_sysbench_max="Latency max (ms)"
+    local t_sysbench_95th_percentile="Latency 95th percentile (ms)"
     ;;
   *)
     local t_warm="系統非空閒 (當前CPU總使用率: %.0f%%)，測試結果可能不準。"
     local t_title="## CPU 誠信度測試"
     local t_start="${CYAN}開始執行 CPU 誠信度測試...${RESET}"
-    local t_params="[參數: 2輪靜態分析 + 1輪壓力分析]"
     local t_test_run="正在進行第 %d/2 次靜態分析 (此過程約需 15 秒)..."
     local t_post_rest="${CYAN}第一次測試完成，30 秒冷卻中...${RESET}"
     local t_stress_start="${CYAN}靜態分析完成，開始執行壓力測試...${RESET}"
     local t_analysis="--- 最終分析結論 ---"
     local t_st_report="Steal Time (竊取時間) 峰值: %.2f%%"
     local t_st_count_report="Steal Time (竊取時間) 非零次數: %d/%d (%s%%)"
-    local t_lat_report="最大內核延遲 (Max Latency): %s µs"
-    local t_avg_report="平均延遲 (Average): %.1f µs"
-    local t_stress_report="壓力測試峰值延遲 (Stress Peak): %d µs"
-    local t_grade_report="綜合性能評級 (Score): %b"
-    local t_grade_reason="評級原因:"
-    
-    local t_reason_steal_good="CPU 竊取時間極低 (%.2f%% < 1%%)"
-    local t_reason_steal_ok="CPU 竊取時間可接受 (%.2f%% < 3%%)"
-    local t_reason_steal_warn="CPU 竊取時間偏高 (%.2f%% < 5%%)"
-    local t_reason_steal_bad="CPU 竊取時間嚴重 (%.2f%% ≥ 5%%)"
-    
-    local t_reason_avg_exc="平均延遲優秀 (%.1f µs)"
-    local t_reason_avg_good="平均延遲良好 (%.1f µs)"
-    local t_reason_avg_ok="平均延遲偏高 (%.1f µs)"
-    local t_reason_avg_bad="平均延遲過高 (%.1f µs)"
-    
-    local t_reason_spike_isolated="極值為偶發尖刺 (Max/Avg = %.0fx)"
-    local t_reason_spike_frequent="高延遲較頻繁 (Max/Avg = %.0fx)"
-    local t_reason_spike_systemic="存在系統性延遲問題"
-    
-    local t_reason_stability_good="多輪測試延遲穩定 (波動 ≤ 20%%)"
-    local t_reason_stability_ok="多輪測試有輕微波動 (波動 ≤ 50%%)"
-    local t_reason_stability_bad="多輪測試波動較大 (波動 > 50%%)"
-    
-    local t_advice="適用場景:"
-    local t_advice_s="延遲敏感型應用（遊戲伺服器、即時通訊、高頻交易）\n資料庫伺服器\n任何生產環境"
-    local t_advice_a="一般生產環境（Web 服務、API、應用伺服器）\n資料庫（非極端效能需求）\n延  遲敏感應用（建議進行深入測試）"
-    local t_advice_b="通用型應用（網站、部落格、開發與測試）\n資料庫（僅適用於輕量負載）\n不適用於延遲敏感應用"
-    local t_advice_c="輕量級應用（個人部落格、靜態網站）\n僅限開發或測試環境\n不適用於任何生產資料庫\n不適用於延遲敏感應用"
-    local t_advice_f="不適合任何生產環境\n僅可用於離線任務或定時腳本"
-    
-    local t_stress_conclusion_low_impact="壓力結論: 性能卓越，高壓下延遲增幅可控 (%.1fx)"
-    local t_stress_conclusion_high_impact="壓力結論: 性能穩定，高壓下延遲增加顯著但未失控 (%.1fx)"
-    local t_stress_conclusion_bottleneck="壓力結論: 性能瓶頸，高壓下延遲指數級增長 (%.1fx)"
-    local t_stress_params="[壓力參數: %d個並發線程]"
-    local t_stress_conclusion_abnormal="壓力結論: 性能反常，高壓延遲低於標準延遲，可能存在 QoS 限制"
+    local t_sysbench_notice="${YELLOW}接下來將進行 sysbench CPU 測試，共 3 次，每次間隔 1 分鐘休息，整體耗時較長，請耐心等候...${RESET}"
+    local t_sysbench_run="正在進行第 %d/%d 次 sysbench 測試..."
+    local t_sysbench_rest="${CYAN}本次測試完成，休息 1 分鐘中...${RESET}"
+    local t_sysbench_title="### sysbench CPU 詳細測試"
+    local t_sysbench_eps="每秒事件數（EPS）"
+    local t_sysbench_min="延遲最小值 (ms)"
+    local t_sysbench_avg="延遲平均值 (ms)"
+    local t_sysbench_max="延遲最大值 (ms)"
+    local t_sysbench_95th_percentile="第 95 百分位數延遲（P95）(ms)"
     ;;
   esac
 
   sleep 30
-  local cpu_usage=$(mpstat 1 1 | awk '/Average/ {print 100 - $12}')
-  if [ -n "$cpu_usage" ] && (( $(echo "$cpu_usage > 10" | bc -l) )); then
+  if mpstat 1 1 | awk '/Average/ {exit !(100 - $12 > 10)}'; then
     printf "${YELLOW}"
     printf "$t_warm" "$cpu_usage"
     printf "${RESET}\n"
@@ -794,9 +703,6 @@ cpu_oversell_test() {
   local peak_nonzero_count=0
   local peak_total_samples=0
   local all_poetic_outputs=""
-  local cpu_count=$(nproc)
-  local -a max_latencies=()
-  local -a avg_latencies=()  # 新增：記錄每輪的平均延遲
   local test_rounds=2
 
   # --- 第一部分：標準靜態分析 ---
@@ -804,50 +710,14 @@ cpu_oversell_test() {
     printf "\n$t_test_run\n" "$i"
 
     # --- 同步啟動 sar ---
-    LC_ALL=C sar -u 1 15 > "$TEMP_WORKDIR/sar_out.txt" 2>/dev/null &
+    LC_ALL=C sar -u 1 15 > "$TEMP_WORKDIR/sar_out.txt"
     local monitor_pid=$!
     sleep 0.5
-
-    # --- 執行 cyclictest (綁核 + 優先級95) ---
-    local affinity_cmd=""
-    if [ "$cpu_count" -eq 1 ]; then
-      cpu_co=1
-      affinity_cmd="-a 0"
-    else
-      cpu_co=$(echo "$cpu_count - 1" | bc)
-      local last_core=$((cpu_count - 1))
-      
-      if [ "$last_core" -eq 1 ]; then
-          affinity_cmd="-a 1"
-      else
-          affinity_cmd="-a 1-$last_core"
-      fi
-    fi
-    
-    local raw_output=$(cyclictest -t $cpu_co $affinity_cmd -p95 -i500 -d10 -l10000 -m 2>/dev/null | grep '^T:' | tail -n "$cpu_co")
+    cyclictest --smp -p95 -i500 -d10 -l10000 -m >/dev/null 2>&1
 
     # --- 停止監控 ---
     kill $monitor_pid 2>/dev/null
     wait $monitor_pid 2>/dev/null || true
-
-    local poetic_output=$(echo "$raw_output" | awk '{
-      min=""; avg=""; max="";
-      for(i=1; i<=NF; i++) { 
-        if($i == "Min:") min=$(i+1); 
-        if($i == "Avg:") avg=$(i+1); 
-        if($i == "Max:") max=$(i+1); 
-      }
-      printf "T%-2s Min: %-5s Avg: %-5s Max: %-5s\n", $2, min, avg, max
-    }')
-    echo "$poetic_output"
-    all_poetic_outputs+="[Round $i]\n$poetic_output\n"
-
-    # --- 提取數據 ---
-    local run_max_latency=$(echo "$raw_output" | awk -F'Max: ' '{print $2}' | awk '{print $1}' | sort -rn | head -n1)
-    local run_avg_latency=$(echo "$raw_output" | awk -F'Avg: ' '{print $2}' | awk '{print $1}' | awk '{sum+=$1; count++} END {if(count>0) print sum/count; else print 0}')
-    
-    max_latencies+=( "${run_max_latency:-0}" )
-    avg_latencies+=( "${run_avg_latency:-0}" )
 
     # --- 分析 sar ---
     local sar_stats=$(awk '
@@ -863,9 +733,10 @@ cpu_oversell_test() {
 
     read current_max_st current_nonzero_count current_total_samples <<< "$sar_stats"
 
-    if (( $(echo "$current_max_st > $peak_st_value" | bc -l) )); then
-      peak_st_value=$current_max_st
-    fi
+    # 使用 awk 的離開狀態碼（exit code）來做 if 判斷
+  if awk -v cur="$current_max_st" -v peak="$peak_st_value" 'BEGIN {exit !(cur > peak)}'; then
+    peak_st_value=$current_max_st
+  fi
 
     if [ "$current_nonzero_count" -gt "$peak_nonzero_count" ]; then
       peak_nonzero_count=$current_nonzero_count
@@ -880,287 +751,84 @@ cpu_oversell_test() {
     fi
   done
   
-  # --- 計算統計數據 ---
-  local latencies_str=$(printf '%s ' "${max_latencies[@]}"; echo)
-  
-  # 計算平均延遲的平均值
-  local sum_avg=0
-  for val in "${avg_latencies[@]}"; do 
-    sum_avg=$(echo "$sum_avg + $val" | bc -l)
-  done
-  local overall_avg=$(echo "scale=1; $sum_avg / ${#avg_latencies[@]}" | bc -l)
-  
-  # 計算最大延遲的平均值 (用於壓力測試對比)
-  local sum_max=0
-  for val in "${max_latencies[@]}"; do 
-    sum_max=$((sum_max + val))
-  done
-  local avg_max=$((sum_max / ${#max_latencies[@]}))
-  
-  # 計算穩定性 (兩輪平均延遲的波動)
-  local stability_variation=0
-  if [[ ${#avg_latencies[@]} -eq 2 ]]; then
-    local diff=$(echo "scale=2; (${avg_latencies[0]} - ${avg_latencies[1]}) / ((${avg_latencies[0]} + ${avg_latencies[1]}) / 2) * 100" | bc -l | awk '{print ($1<0)?-$1:$1}')
-    stability_variation=$(printf "%.0f" "$diff")
-  fi
-
-  # --- 第二部分：壓力分析 ---
-  echo -e "\n$t_stress_start"
-  local stress_threads=$((cpu_count * 8))
-  [ $stress_threads -gt 128 ] && stress_threads=128
-  printf "$t_stress_params\n" "$stress_threads"
-  
-  local stress_raw_output=$(cyclictest -t $stress_threads -p95 -i500 -d10 -l10000 -m 2>/dev/null | grep '^T:' | tail -n "$stress_threads")
-  echo "$stress_raw_output"
-  local stress_peak_latency=$(echo "$stress_raw_output" | awk -F'Max: ' '{print $2}' | awk '{print $1}' | sort -rn | head -n1)
-  stress_peak_latency=${stress_peak_latency:-0}
-  all_poetic_outputs+="\n[Stress Test - ${stress_threads} Threads]\n$stress_raw_output\n"
-
   # --- 第三部分：智能評級 ---
   echo -e "\n--------------------------"
   echo "$t_analysis"
   
   [ -z "$peak_total_samples" ] || [ "$peak_total_samples" -eq 0 ] && peak_total_samples=1
   
-  local raw_percent=$(echo "$peak_nonzero_count * 100 / $peak_total_samples" | bc -l)
-  local formatted_percent=$(printf "%.1f" "$raw_percent")
-  local final_percent="${formatted_percent%.0}"
+  # %.2f 代表只保留到小數點後兩位
+  local final_percent=$(awk -v count="$peak_nonzero_count" -v total="$peak_total_samples" 'BEGIN {if (total > 0) printf "%g", (count * 100 / total); else print "0"}')
 
   printf "$t_st_report\n" "$peak_st_value"
   printf "$t_st_count_report\n" "$peak_nonzero_count" "$peak_total_samples" "$final_percent"
-  printf "$t_lat_report\n" "${latencies_str% }"
-  printf "$t_avg_report\n" "$overall_avg"
-  printf "$t_stress_report\n" "$stress_peak_latency"
   
-  # --- 1. 壓力測試結論 ---
-  local stress_conclusion=""
-  local stress_ratio=0
-  
-  if [[ ${#max_latencies[@]} -eq 2 ]] && \
-     (( $(echo "$stress_peak_latency < ${max_latencies[0]}" | bc -l) )) && \
-     (( $(echo "$stress_peak_latency < ${max_latencies[1]}" | bc -l) )); then
-    stress_conclusion="$t_stress_conclusion_abnormal"
-    stress_ratio=0
-  else
-    if (( $(echo "$avg_max > 0" | bc -l) )); then
-      stress_ratio=$(echo "scale=1; $stress_peak_latency / $avg_max" | bc -l)
-    fi
-    
-    if (( $(echo "$stress_ratio <= 10.0" | bc -l) )); then
-      stress_conclusion=$(printf "$t_stress_conclusion_low_impact" "$stress_ratio")
-    elif (( $(echo "$stress_ratio <= 30.0" | bc -l) )); then
-      stress_conclusion=$(printf "$t_stress_conclusion_high_impact" "$stress_ratio")
-    else
-      stress_conclusion=$(printf "$t_stress_conclusion_bottleneck" "$stress_ratio")
-    fi
-  fi
-
-  # --- 2. 智能評級邏輯 ---
-  local grade="C"
-  local color_grade=""
-  local grade_reasons=""
-  local advice=""
-  
-  # 計算 Max/Avg 比值
-  local max_avg_ratio=0
-  if (( $(echo "$overall_avg > 0" | bc -l) )); then
-    # 使用兩輪中的最大 Max 值
-    local absolute_max=${max_latencies[0]}
-    for val in "${max_latencies[@]}"; do
-      if (( val > absolute_max )); then
-        absolute_max=$val
-      fi
-    done
-    max_avg_ratio=$(echo "scale=0; $absolute_max / $overall_avg" | bc -l)
-  fi
-  
-  # === 評級決策樹 ===
-  
-  # 第一優先級：Steal Time 嚴重超標 → 直接 F
-  if (( $(echo "$peak_st_value >= 5.0" | bc -l) )); then
-    grade="F (Steal Time Critical)"
-    color_grade="${RED}$grade${RESET}"
-    grade_reasons=$(printf "$t_reason_steal_bad" "$peak_st_value")
-    advice="$t_advice_f"
-    
-  # 第二優先級：Steal Time 中度 (2-5%) → 最高 C
-  elif (( $(echo "$peak_st_value >= 2.0" | bc -l) )); then
-    grade="C (Steal Time High)"
-    color_grade="${YELLOW}$grade${RESET}"
-    grade_reasons=$(printf "$t_reason_steal_warn" "$peak_st_value")
-    advice="$t_advice_c"
-    
-  # 第三優先級：平均延遲過高 (>150µs) → 最高 C
-  elif (( $(echo "$overall_avg > 150" | bc -l) )); then
-    grade="C (High Latency)"
-    color_grade="${YELLOW}$grade${RESET}"
-    grade_reasons=$(printf "$t_reason_avg_bad" "$overall_avg")
-    [ -n "$grade_reasons" ] && grade_reasons+="\n"
-    if (( $(echo "$peak_st_value < 1.0" | bc -l) )); then
-      grade_reasons+=$(printf "$t_reason_steal_good" "$peak_st_value")
-    else
-      grade_reasons+=$(printf "$t_reason_steal_ok" "$peak_st_value")
-    fi
-    advice="$t_advice_c"
-    
-  # 正常情況：根據 Avg + 穩定性 + Max/Avg 比值綜合評分
-  else
-    # 基於平均延遲的基礎評級
-    if (( $(echo "$overall_avg <= 30" | bc -l) )); then
-      # 潛在 S 或 A
-      base_grade="S"
-      grade_reasons=$(printf "$t_reason_avg_exc" "$overall_avg")
-    elif (( $(echo "$overall_avg <= 50" | bc -l) )); then
-      # 潛在 A 或 B
-      base_grade="A"
-      grade_reasons=$(printf "$t_reason_avg_good" "$overall_avg")
-    elif (( $(echo "$overall_avg <= 100" | bc -l) )); then
-      # 潛在 B 或 C
-      base_grade="B"
-      grade_reasons=$(printf "$t_reason_avg_ok" "$overall_avg")
-    else
-      # 潛在 C
-      base_grade="C"
-      grade_reasons=$(printf "$t_reason_avg_bad" "$overall_avg")
-    fi
-    
-    # 檢查 Steal Time
-    grade_reasons+="\n"
-    if (( $(echo "$peak_st_value < 1.0" | bc -l) )); then
-      grade_reasons+=$(printf "$t_reason_steal_good" "$peak_st_value")
-    elif (( $(echo "$peak_st_value < 3.0" | bc -l) )); then
-      grade_reasons+=$(printf "$t_reason_steal_ok" "$peak_st_value")
-      # Steal 稍高，降一級
-      if [ "$base_grade" == "S" ]; then base_grade="A"; fi
-    fi
-    
-    # 檢查穩定性
-    grade_reasons+="\n"
-    if (( stability_variation <= 20 )); then
-      grade_reasons+=$(printf "$t_reason_stability_good")
-    elif (( stability_variation <= 50 )); then
-      grade_reasons+=$(printf "$t_reason_stability_ok")
-      # 穩定性一般，可能降級
-      if [ "$base_grade" == "S" ]; then base_grade="A"; fi
-    else
-      grade_reasons+=$(printf "$t_reason_stability_bad")
-      # 穩定性差，降一級
-      case "$base_grade" in
-        S) base_grade="A" ;;
-        A) base_grade="B" ;;
-        B) base_grade="C" ;;
-      esac
-    fi
-    
-    # 檢查 Max/Avg 比值 (尖刺分析)
-    grade_reasons+="\n"
-    if (( max_avg_ratio <= 100 )); then
-      # Max/Avg ≤ 100x → 偶發尖刺，不影響評級
-      grade_reasons+=$(printf "$t_reason_spike_isolated" "$max_avg_ratio")
-    elif (( max_avg_ratio <= 300 )); then
-      # Max/Avg 100-300x → 尖刺較頻繁，降一級
-      grade_reasons+=$(printf "$t_reason_spike_frequent" "$max_avg_ratio")
-      case "$base_grade" in
-        S) base_grade="A-" ;;
-        A) base_grade="B+" ;;
-        B) base_grade="B" ;;
-      esac
-    else
-      # Max/Avg > 300x 但 Avg 仍低 → 極端偶發事件，輕微扣分
-      if (( $(echo "$overall_avg <= 50" | bc -l) )); then
-        grade_reasons+=$(printf "$t_reason_spike_isolated" "$max_avg_ratio")
-        grade_reasons+=" (極端偶發)"
-        if [ "$base_grade" == "S" ]; then base_grade="A"; fi
-      else
-        # Avg 也不低 + 高比值 → 系統性問題
-        grade_reasons+=$(printf "$t_reason_spike_systemic")
-        case "$base_grade" in
-          S|A) base_grade="B" ;;
-          B) base_grade="C" ;;
-        esac
-      fi
-    fi
-    
-    # 壓力測試加成/扣分
-    if [[ "$stress_conclusion" == *"abnormal"* ]] || [[ "$stress_conclusion" == *"反常"* ]]; then
-      # 壓力測試異常，降一級
-      case "$base_grade" in
-        S) base_grade="A" ;;
-        A|A-) base_grade="B" ;;
-        B+|B) base_grade="B-" ;;
-      esac
-    elif (( $(echo "$stress_ratio > 0 && $stress_ratio <= 5.0" | bc -l) )); then
-      # 壓力測試表現極佳，可能提升評級
-      if [ "$base_grade" == "A" ] && (( $(echo "$overall_avg <= 25" | bc -l) )); then
-        base_grade="S"
-      fi
-    elif (( $(echo "$stress_ratio > 50.0" | bc -l) )); then
-      # 壓力下崩潰，降一級
-      case "$base_grade" in
-        S) base_grade="A-" ;;
-        A|A-) base_grade="B" ;;
-        B+|B) base_grade="C" ;;
-      esac
-    fi
-    
-    # 最終評級和建議
-    grade="$base_grade"
-    case "$base_grade" in
-      S)
-        color_grade="${GREEN}S (Excellent)${RESET}"
-        advice="$t_advice_s"
-        ;;
-      A|A-)
-        color_grade="${CYAN}A (Good)${RESET}"
-        advice="$t_advice_a"
-        ;;
-      B+|B|B-)
-        color_grade="${YELLOW}B (Average)${RESET}"
-        advice="$t_advice_b"
-        ;;
-      C)
-        color_grade="${YELLOW}C (Below Average)${RESET}"
-        advice="$t_advice_c"
-        ;;
-    esac
-  fi
-  
-  # --- 輸出評級和原因 ---
-  printf "$t_grade_report\n\n" "$color_grade"
-  echo "$t_grade_reason"
-  echo -e "$grade_reasons"
-  echo ""
-  echo "$t_advice"
-  echo -e "$advice"
-  echo ""
-  echo "---"
-  echo -e "$stress_conclusion"
-
   # --- 寫入報告 ---
   {
     echo ""
     echo "$t_title"
-    echo "$t_params"
-    echo '```'
-    echo -e "$all_poetic_outputs"
-    echo '```'
-    echo ""
     printf "$t_st_report\n" "$peak_st_value"
     printf "$t_st_count_report\n" "$peak_nonzero_count" "$peak_total_samples" "$final_percent"
-    printf "$t_lat_report\n" "${latencies_str% }"
-    printf "$t_avg_report\n" "$overall_avg"
-    printf "$t_stress_report\n" "$stress_peak_latency"
-    echo ""
-    printf "$t_grade_report\n\n" "$grade"
-    echo "$t_grade_reason"
-    echo -e "$grade_reasons"
-    echo ""
-    echo "$t_advice"
-    echo -e "$advice"
+  } >> "$report"
+  
+  # --- 第二部分：sysbench CPU 效能測試 (3 次，每次間隔 1 分鐘) ---
+  echo -e "\n$t_sysbench_notice"
+
+  local sysbench_rounds=3
+  local -a sb_eps=()
+  local -a sb_min=()
+  local -a sb_avg=()
+  local -a sb_max=()
+  local -a sb_95th_percentile=()
+  local sb_blocks=""
+
+  for (( i=1; i<=sysbench_rounds; i++ )); do
+    printf "\n$t_sysbench_run\n" "$i" "$sysbench_rounds"
+
+    local sb_out="$TEMP_WORKDIR/sysbench_run_$i.txt"
+    # 即時顯示在畫面上，同時擷取內容到暫存檔
+    sysbench cpu --cpu-max-prime=20000 --threads=1 run | tee "$sb_out"
+
+    # 擷取從 "CPU speed:" 開始到結尾的區塊
+    local block
+    block=$(awk '/^CPU speed:/,0' "$sb_out")
+    sb_blocks+=$'\n'"**Run $i**"$'\n'"\`\`\`"$'\n'"$block"$'\n'"\`\`\`"$'\n'
+
+    # 擷取重點數據
+    sb_eps+=("$(grep 'events per second:' "$sb_out" | awk '{print $NF}')")
+    sb_min+=("$(awk '/^ *min:/{print $NF; exit}' "$sb_out")")
+    sb_avg+=("$(awk '/^ *avg:/{print $NF; exit}' "$sb_out")")
+    sb_max+=("$(awk '/^ *max:/{print $NF; exit}' "$sb_out")")
+    sb_95th_percentile+=("$(awk '/^ *95th percentile:/{print $NF; exit}' "$sb_out")")
+    
+    rm -f "$sb_out"
+
+    if [ $i -lt $sysbench_rounds ]; then
+      echo -e "$t_sysbench_rest"
+      sleep 60
+    fi
+  done
+  echo "Test done."
+  
+  echo "$t_sysbench_eps: 1st=${sb_eps[0]}, 2nd=${sb_eps[1]}, 3rd=${sb_eps[2]}"
+  echo "$t_sysbench_min: 1st=${sb_min[0]}, 2nd=${sb_min[1]}, 3rd=${sb_min[2]}"
+  echo "$t_sysbench_avg: 1st=${sb_avg[0]}, 2nd=${sb_avg[1]}, 3rd=${sb_avg[2]}"
+  echo "$t_sysbench_max: 1st=${sb_max[0]}, 2nd=${sb_max[1]}, 3rd=${sb_max[2]}"
+  echo "$t_sysbench_95th_percentile: 1st=${sb_95th_percentile[0]}, 2nd=${sb_95th_percentile[1]}, 3rd=${sb_95th_percentile[2]}"
+
+  # --- 寫入報告：重點摘要 + 完整區塊 ---
+  {
     echo ""
     echo "---"
     echo ""
-    echo -e "**$stress_conclusion**"
+    echo "$t_sysbench_title"
+    echo ""
+    echo "$t_sysbench_eps: 1st=${sb_eps[0]}, 2nd=${sb_eps[1]}, 3rd=${sb_eps[2]}"
+    echo "$t_sysbench_min: 1st=${sb_min[0]}, 2nd=${sb_min[1]}, 3rd=${sb_min[2]}"
+    echo "$t_sysbench_avg: 1st=${sb_avg[0]}, 2nd=${sb_avg[1]}, 3rd=${sb_avg[2]}"
+    echo "$t_sysbench_max: 1st=${sb_max[0]}, 2nd=${sb_max[1]}, 3rd=${sb_max[2]}"
+    echo "$t_sysbench_95th_percentile: 1st=${sb_95th_percentile[0]}, 2nd=${sb_95th_percentile[1]}, 3rd=${sb_95th_percentile[2]}"
+    echo -e "$sb_blocks"
   } >> "$report"
 }
 
