@@ -76,7 +76,7 @@ else
   echo -e "nameserver 8.8.8.8\nnameserver 1.1.1.1" > "/srv/bench_os/etc/resolv.conf"
 fi
 
-chroot /srv/bench_os bash <(curl -sL "https://gitlab.com/gebu8f/sh/-/raw/main/testing_server/mb-test.sh") "$@"
+chroot /srv/bench_os bash <(curl -sL "https://gitlab.com/gebu8f/sh/-/raw/main/testing_server/mb_test.sh") "$@"
 mkdir -p "$HOME/result"
 cp -a /srv/bench_os/root/result/* "$HOME/result/"
 cp -f /srv/bench_os/var/log/matrixbench_error.log /var/log/matrixbench_error.log 
