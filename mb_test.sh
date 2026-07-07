@@ -35,7 +35,7 @@ YELLOW='\033[1;33m'  # ⚠️ 警告用黃色
 CYAN="\033[1;36m"    # ℹ️ 一般提示用青色
 RESET='\033[0m'      # 清除顏色
 
-version="v2026.07.03"
+version="v2026.07.07"
 
 handle_error() {
     local exit_code=$?
@@ -171,9 +171,15 @@ check_app(){
   fi
     
   declare -A pkg_map=(
-    ["sar"]="sysstat" ["curl"]="curl" ["jq"]="jq" ["unzip"]="unzip"
-    ["fc-list"]="fontconfig" ["script"]="$pkg_script" ["aha"]="aha"
-    ["bc"]="bc" ["cyclictest"]="$pkg_cyclictest" ["sysbench"]="sysbench"
+    ["sar"]="sysstat"
+    ["curl"]="curl"
+    ["jq"]="jq"
+    ["unzip"]="unzip"
+    ["fc-list"]="fontconfig"
+    ["script"]="$pkg_script"
+    ["aha"]="aha"
+    ["cyclictest"]="$pkg_cyclictest"
+    ["sysbench"]="sysbench"
     ["convert"]="$pkg_convert"
   )
 
@@ -191,39 +197,41 @@ check_app(){
     fi
   done
   
-  local installed_fonts=""
-  if command -v fc-list >/dev/null 2>&1; then
+  if $do_img; then
+    local installed_fonts=""
+    if command -v fc-list >/dev/null 2>&1; then
       installed_fonts=$(fc-list : family)
-  fi
+    fi
 
 
-  if [[ ! "$installed_fonts" =~ "Noto Color Emoji" && ! "$installed_fonts" =~ "NotoColorEmoji" ]]; then
-    case $system in
-    1) install_list+=" fonts-noto-color-emoji" ;;
-    2) 
-      if ! rpm -q google-noto-color-emoji-fonts >/dev/null 2>&1; then
-        install_list+=" google-noto-color-emoji-fonts"
-      fi
-      ;;
-    esac
-    need_fc_cache=true
-  fi
-
-  # --- CJK 檢查修正 ---
-  if [ "$lang" != "us" ]; then
-    if [[ ! "$installed_fonts" =~ "Noto Sans CJK" ]]; then
+    if [[ ! "$installed_fonts" =~ "Noto Color Emoji" && ! "$installed_fonts" =~ "NotoColorEmoji" ]]; then
       case $system in
-      1)
-        install_list+=" fonts-noto-cjk fonts-noto-mono"
-        ;;
-      2)
-        # 檢查 rpm 避免重複
-        if ! rpm -q google-noto-sans-cjk-ttc-fonts >/dev/null 2>&1; then
-          install_list+=" google-noto-sans-cjk-ttc-fonts google-noto-sans-mono-fonts"
+      1) install_list+=" fonts-noto-color-emoji" ;;
+      2) 
+        if ! rpm -q google-noto-color-emoji-fonts >/dev/null 2>&1; then
+          install_list+=" google-noto-color-emoji-fonts"
         fi
         ;;
       esac
       need_fc_cache=true
+    fi
+
+    # --- CJK 檢查修正 ---
+    if [ "$lang" != "us" ]; then
+      if [[ ! "$installed_fonts" =~ "Noto Sans CJK" ]]; then
+        case $system in
+        1)
+          install_list+=" fonts-noto-cjk fonts-noto-mono"
+          ;;
+        2)
+          # 檢查 rpm 避免重複
+          if ! rpm -q google-noto-sans-cjk-ttc-fonts >/dev/null 2>&1; then
+            install_list+=" google-noto-sans-cjk-ttc-fonts google-noto-sans-mono-fonts"
+          fi
+          ;;
+        esac
+        need_fc_cache=true
+      fi
     fi
   fi
 
@@ -247,7 +255,7 @@ check_app(){
   fi
 
   # 5. 刷新字體快取
-  if [ "$need_fc_cache" = true ]; then
+  if [[ "$need_fc_cache" == "true" ]]; then
     fc-cache -fv >/dev/null 2>&1
   fi
 }
@@ -857,7 +865,6 @@ disk_test() {
   cn)
     local t_title="## 磁盘 I/O 稳定性测试"
     local t_warm_disk="警告: 检测到硬盘繁忙 (当前最大利用率: %.1f%%)，测试结果可能受影响。"
-    # 提示用戶需要等待較長時間
     local t_start_strict="${CYAN}开始执行磁盘 I/O 稳定性测试 (严格模式: Direct/Sync IO, 200次/约100秒, 请耐心等待)...${RESET}"
     local t_start_normal="${CYAN}开始执行磁盘 I/O 稳定性测试 (标准模式: Cached IO, 100次/约100秒, 请耐心等待)...${RESET}"
     local t_raw_data="[原始数据] %s"
@@ -878,10 +885,10 @@ disk_test() {
     local t_mode_normal="[Mode] Standard (Cached I/O) - Regular File Operations"
     ;;
   *)
-    local t_title="## 磁盤 I/O 穩定性測試"
+    local t_title="## 硬碟 I/O 穩定性測試"
     local t_warm_disk="警告: 檢測到硬碟繁忙 (當前最大利用率: %.1f%%)，測試結果可能受影響。"
-    local t_start_strict="${CYAN}開始執行磁盤 I/O 穩定性測試 (嚴格模式: Direct/Sync IO, 200次/約100秒, 請耐心等待)...${RESET}"
-    local t_start_normal="${CYAN}開始執行磁盤 I/O 穩定性測試 (標準模式: Cached IO, 100次/約100秒, 請耐心等待)...${RESET}"
+    local t_start_strict="${CYAN}開始執行硬碟 I/O 穩定性測試 (嚴格模式: Direct/Sync IO, 200次/約100秒, 請耐心等待)...${RESET}"
+    local t_start_normal="${CYAN}開始執行硬碟 I/O 穩定性測試 (標準模式: Cached IO, 100次/約100秒, 請耐心等待)...${RESET}"
     local t_raw_data="[原始數據] %s"
     local t_result="I/O 平均延遲: %.1f us | 最大延遲: %.1f us | 抖動 (mdev): %.1f us"
     local t_grade="I/O 穩定性評級: %b"
@@ -895,7 +902,8 @@ disk_test() {
   # --- 0. 檢測硬碟繁忙 ---
   local disk_util=$(LC_ALL=C sar -d 1 1 | grep Average | grep -v DEV | awk '{print $NF}' | sort -rn | head -n1)
   if [[ "$disk_util" =~ ^[0-9.]+$ ]]; then
-    if (( $(echo "$disk_util > 10.0" | bc -l) )); then
+    # 使用 awk 替換 bc 進行浮點數比較
+    if awk -v n="$disk_util" 'BEGIN { exit !(n > 10.0) }'; then
       printf "${YELLOW}"
       printf "$t_warm_disk" "$disk_util"
       printf "${RESET}\n"
@@ -909,27 +917,18 @@ disk_test() {
   local t_mode_msg=""
 
   # --- 2. 執行測試 (同步阻塞模式) ---
-  
-  # 測試是否支持 -D -Y
   if ioping -c 1 -D -Y . &>/dev/null; then
-    # 支持嚴格模式
     t_start_msg="$t_start_strict"
     t_mode_msg="$t_mode_strict"
     echo -e "\n$t_start_msg"
-    
-    # 直接執行，不加 &，腳本會在這裡「暫停」直到測試完成
     raw_line=$($test_cmd 2>/dev/null | tail -n 1)
   else
-    # 不支持，回退
     t_start_msg="$t_start_normal"
     t_mode_msg="$t_mode_normal"
     echo -e "\n$t_start_msg"
-    
-    # 標準模式
     raw_line=$(ioping -a 2 -c 100 -q . 2>/dev/null | tail -n 1)
   fi
 
-  # 防止空數據
   if [ -z "$raw_line" ]; then
     raw_line="min/avg/max/mdev = 0 us / 0 us / 0 us / 0 us"
   fi
@@ -948,9 +947,15 @@ disk_test() {
     local num=$(echo "$val" | awk '{print $1}')
     local unit=$(echo "$val" | awk '{print $2}')
     if [ -z "$num" ]; then echo "0"; return; fi
-    if [[ "$unit" == "ms" ]]; then echo "scale=2; $num * 1000" | bc -l
-    elif [[ "$unit" == "s" ]]; then echo "scale=2; $num * 1000000" | bc -l
-    else echo "$num"; fi
+    
+    # 使用 awk 替換 bc 進行乘法運算
+    if [[ "$unit" == "ms" ]]; then 
+      awk -v n="$num" 'BEGIN { printf "%.2f", n * 1000 }'
+    elif [[ "$unit" == "s" ]]; then 
+      awk -v n="$num" 'BEGIN { printf "%.2f", n * 1000000 }'
+    else 
+      echo "$num"
+    fi
   }
 
   local avg_us=$(convert_to_us "$avg_str")
@@ -965,19 +970,20 @@ disk_test() {
   local grade="F"
   local color_grade=""
 
-  if (( $(echo "$mdev_us <= 50" | bc -l) )); then
+  # 使用 awk 替換 bc 進行級別判斷
+  if awk -v n="$mdev_us" 'BEGIN { exit !(n <= 50) }'; then
     grade="S (Extremely Stable)"
     color_grade="${GREEN}$grade${RESET}"
-  elif (( $(echo "$mdev_us <= 100" | bc -l) )); then
+  elif awk -v n="$mdev_us" 'BEGIN { exit !(n <= 100) }'; then
     grade="A (Very Stable)"
     color_grade="${CYAN}$grade${RESET}"
-  elif (( $(echo "$mdev_us <= 300" | bc -l) )); then
+  elif awk -v n="$mdev_us" 'BEGIN { exit !(n <= 300) }'; then
     grade="B (Stable)"
     color_grade="${YELLOW}$grade${RESET}"
-  elif (( $(echo "$mdev_us <= 500" | bc -l) )); then
+  elif awk -v n="$mdev_us" 'BEGIN { exit !(n <= 500) }'; then
     grade="C (Average)"
     color_grade="${YELLOW}$grade${RESET}"
-  elif (( $(echo "$mdev_us <= 1000" | bc -l) )); then
+  elif awk -v n="$mdev_us" 'BEGIN { exit !(n <= 1000) }'; then
     grade="D (Jittery)"
     color_grade="${RED}$grade${RESET}"
   else
@@ -1006,83 +1012,116 @@ EOF
 }
 
 seven_zip_test() {
+  _calc_stats() {
+    awk '
+    {
+      for (i=1;i<=NF;i++){
+        if (NR==1 && i==1) { min=$i; max=$i }
+        sum+=$i
+        if ($i<min) min=$i
+        if ($i>max) max=$i
+      }
+      n=NF
+    }
+    END{
+      avg=sum/n
+      printf "%s %s %s %s", sum, avg, min, max
+    }' <<< "$*"
+  }
   local report="$HOME/result/hardware.txt"
-  
-  # --- 1. 定義語言字串 ---
+
+  # --- 1. 語言字串資料表（合併 cn/us/tw，只保留一份變數宣告邏輯）---
+  # 欄位順序必須與 field_names 對應
+  local field_names=(title check_ver installing round_start warm cooldown running \
+    cpu_sig freq cores scores comp_score decomp_score avg jitter jitter_desc ref ref_desc final_output)
+
+  local -a FIELDS
   case "$lang" in
     cn)
-      local t_title="## 7-Zip CPU 性能基准测试 (3轮平均)"
-      local t_check_ver="正在检测并获取最新 7-Zip 版本 (GitHub)..."
-      local t_installing="正在下载并配置 7-Zip (%s)..."
-      local t_round_start="=== 开始执行第 %d 轮测试 (共 3 轮) ==="
-      local t_warm="警告: 系统非空闲 (当前CPU总使用率: %.0f%%)，测试结果可能不准。"
-      local t_cooldown="正在冷却 CPU (休息 30 秒)..."
-      local t_running="${CYAN}正在运行 7-Zip 基准测试 (多线程模式)...${RESET}"
-      local t_cpu_sig="CPU 代号 (VPS用户不一定准确)"
-      local t_freq="CPU 频率 (全核心实测范围)"
-      local t_cores="核心数"
-      local t_scores="三次评分 (总分 MIPS)"
-      local t_comp_score="压缩评分 (三次 MIPS)"
-      local t_decomp_score="解压评分 (三次 MIPS)"
-      local t_avg="平均分"
-      local t_jitter="差异倍率 (抖动)"
-      local t_jitter_desc="(数值越小越稳定)"
-      local t_ref="参考范围 (基于实测资源)"
-      local t_ref_desc="[参考] 现代 CPU 單核分數通常在 3500-6000 MIPS 之间"
-      local t_final_output="${GREEN}测试完成。平均分: %s | 抖动: %s | 频率: %s${RESET}"
+      FIELDS=(
+        "## 7-Zip CPU 性能基准测试 (3轮平均)"
+        "正在检测并获取最新 7-Zip 版本 (GitHub)..."
+        "正在下载并配置 7-Zip (%s)..."
+        "=== 开始执行第 %d 轮测试 (共 3 轮) ==="
+        "警告: 系统非空闲 (当前CPU总使用率: %.0f%%)，测试结果可能不准。"
+        "正在冷却 CPU (休息 30 秒)..."
+        "${CYAN}正在运行 7-Zip 基准测试 (多线程模式)...${RESET}"
+        "CPU 代号 (VPS用户不一定准确)"
+        "CPU 频率 (全核心实测范围)"
+        "核心数"
+        "三次评分 (总分 MIPS)"
+        "压缩评分 (三次 MIPS)"
+        "解压评分 (三次 MIPS)"
+        "平均分"
+        "差异倍率 (抖动)"
+        "(数值越小越稳定)"
+        "参考范围 (基于实测资源)"
+        "[参考] 现代 CPU 單核分數通常在 3500-6000 MIPS 之间"
+        "${GREEN}测试完成。平均分: %s | 抖动: %s | 频率: %s${RESET}"
+      )
       ;;
     us)
-      local t_title="## 7-Zip CPU Performance Benchmark (3-Run Avg)"
-      local t_check_ver="Checking and fetching latest 7-Zip version (GitHub)..."
-      local t_installing="Downloading and configuring 7-Zip (%s)..."
-      local t_round_start="=== Starting Run %d of 3 ==="
-      local t_warm="Warning: System busy (CPU Usage: %.0f%%), results may be inaccurate."
-      local t_cooldown="Cooling down CPU (Resting 30s)..."
-      local t_running="${CYAN}Running 7-Zip Benchmark (Multi-threading)...${RESET}"
-      local t_cpu_sig="CPU Signature（VPS users aren't always accurate）"
-      local t_freq="CPU Freq (Measured Range)"
-      local t_cores="Cores"
-      local t_scores="Run Scores (Total MIPS)"
-      local t_comp_score="Compression Scores (MIPS)"
-      local t_decomp_score="Decompression Scores (MIPS)"
-      local t_avg="Average Score"
-      local t_jitter="Deviation Ratio"
-      local t_jitter_desc="(Lower is better)"
-      local t_ref="Reference (Based on Usage)"
-      local t_ref_desc="[Ref] Modern CPUs typically score 3500-6000 MIPS per core"
-      local t_final_output="${GREEN}Test Complete. Avg: %s | Dev: %s | Freq: %s${RESET}"
+      FIELDS=(
+        "## 7-Zip CPU Performance Benchmark (3-Run Avg)"
+        "Checking and fetching latest 7-Zip version (GitHub)..."
+        "Downloading and configuring 7-Zip (%s)..."
+        "=== Starting Run %d of 3 ==="
+        "Warning: System busy (CPU Usage: %.0f%%), results may be inaccurate."
+        "Cooling down CPU (Resting 30s)..."
+        "${CYAN}Running 7-Zip Benchmark (Multi-threading)...${RESET}"
+        "CPU Signature（VPS users aren't always accurate）"
+        "CPU Freq (Measured Range)"
+        "Cores"
+        "Run Scores (Total MIPS)"
+        "Compression Scores (MIPS)"
+        "Decompression Scores (MIPS)"
+        "Average Score"
+        "Deviation Ratio"
+        "(Lower is better)"
+        "Reference (Based on Usage)"
+        "[Ref] Modern CPUs typically score 3500-6000 MIPS per core"
+        "${GREEN}Test Complete. Avg: %s | Dev: %s | Freq: %s${RESET}"
+      )
       ;;
     *)
-      local t_title="## 7-Zip CPU 性能基準測試 (3輪平均)"
-      local t_check_ver="正在檢測並獲取最新 7-Zip 版本 (GitHub)..."
-      local t_installing="正在下載並配置 7-Zip (%s)..."
-      local t_round_start="=== 開始執行第 %d 輪測試 (共 3 輪) ==="
-      local t_warm="警告: 系統非空閒 (當前CPU總使用率: %.0f%%)，測試結果可能不準。"
-      local t_cooldown="正在冷卻 CPU (休息 30 秒)..."
-      local t_running="${CYAN}正在執行 7-Zip 基準測試 (多線程模式)...${RESET}"
-      local t_cpu_sig="CPU 代號（VPS用戶不一定準確）"
-      local t_freq="CPU 頻率 (全核心實測範圍)"
-      local t_cores="核心數"
-      local t_scores="三次評分 (總分 MIPS)"
-      local t_comp_score="壓縮評分 (三次 MIPS)"
-      local t_decomp_score="解壓評分 (三次 MIPS)"
-      local t_avg="平均分"
-      local t_jitter="差異倍率 (抖動)"
-      local t_jitter_desc="(數值越小越穩定)"
-      local t_ref="參照範圍 (基於實測資源)"
-      local t_ref_desc="[參照] 現代 CPU 單核分數通常在 3500-6000 MIPS 之間"
-      local t_final_output="${GREEN}測試完成。平均分: %s | 抖動: %s | 頻率: %s${RESET}"
+      FIELDS=(
+        "## 7-Zip CPU 性能基準測試 (3輪平均)"
+        "正在檢測並獲取最新 7-Zip 版本 (GitHub)..."
+        "正在下載並配置 7-Zip (%s)..."
+        "=== 開始執行第 %d 輪測試 (共 3 輪) ==="
+        "警告: 系統非空閒 (當前CPU總使用率: %.0f%%)，測試結果可能不準。"
+        "正在冷卻 CPU (休息 30 秒)..."
+        "${CYAN}正在執行 7-Zip 基準測試 (多線程模式)...${RESET}"
+        "CPU 代號（VPS用戶不一定準確）"
+        "CPU 頻率 (全核心實測範圍)"
+        "核心數"
+        "三次評分 (總分 MIPS)"
+        "壓縮評分 (三次 MIPS)"
+        "解壓評分 (三次 MIPS)"
+        "平均分"
+        "差異倍率 (抖動)"
+        "(數值越小越穩定)"
+        "參照範圍 (基於實測資源)"
+        "[參照] 現代 CPU 單核分數通常在 3500-6000 MIPS 之間"
+        "${GREEN}測試完成。平均分: %s | 抖動: %s | 頻率: %s${RESET}"
+      )
       ;;
   esac
-  
-  local cpu_usage=$(mpstat 1 1 | awk '/Average/ {print 100 - $12}')
-  if [ -n "$cpu_usage" ] && [ "$(echo "$cpu_usage > 10" | bc)" -eq 1 ]; then
+
+  # 用一個迴圈把 FIELDS 展開成原本的 t_xxx 變數，取代原本三份幾乎一樣的宣告
+  local idx name
+  for idx in "${!field_names[@]}"; do
+    name="${field_names[$idx]}"
+    declare "t_${name}=${FIELDS[$idx]}"
+  done
+
+  if mpstat 1 1 | awk '/Average/ {exit !(100 - $12 > 10)}'; then
     printf "${YELLOW}"
     printf "$t_warm" "$cpu_usage"
     printf "${RESET}\n"
   fi
 
-  # --- 2. 準備環境與動態下載 ---
+  # --- 2. 準備環境與動態下載（此區塊維持原樣，未做任何變動）---
   mkdir -p "$TEMP_WORKDIR"
 
   if [ ! -f "$TEMP_WORKDIR/7zz" ]; then
@@ -1096,9 +1135,9 @@ seven_zip_test() {
     fi
 
     local download_url="https://github.com/ip7z/7zip/releases/download/${latest_tag}/7z${ver_num}-${os_type}.tar.xz"
-      
+
     printf "$t_installing\n" "$latest_tag ($arch)"
-    
+
     (
       cd "$TEMP_WORKDIR" || exit 1
       wget -qO 7z_latest.tar.xz "$download_url"
@@ -1119,30 +1158,29 @@ seven_zip_test() {
   local usages=()        # 總使用率
   local comp_scores=()   # 壓縮評分
   local decomp_scores=() # 解壓評分
-  
+
   local raw_reports=""
   local run_count=3
   local captured_cpu_sig="Unknown"
-  
+
   local global_freq_min=999999
   local global_freq_max=0
 
-  # --- 3. 循環測試 (3次) ---
+  # --- 3. 循環測試 (3次)（邏輯未變，只是引用上面合併好的 t_xxx 變數）---
   for (( i=1; i<=run_count; i++ )); do
     echo ""
     printf "$t_round_start\n" "$i"
     echo -e "$t_running"
-    
+
     (
       cd "$TEMP_WORKDIR" || exit 1
       ./7zz b | tee "7z_output.txt"
     )
-    
+
     local output
     output=$(cat "$TEMP_WORKDIR/7z_output.txt")
 
     # 提取 CPU Signature (例如 800F12)
-    # 邏輯：搜尋括號內的 6 位十六進制代碼
     local sig_tmp=$(echo "$output" | grep -oE "\([0-9A-F]{4,}\)" | head -n 1 | tr -d '()')
     if [ -n "$sig_tmp" ]; then captured_cpu_sig="$sig_tmp"; fi
 
@@ -1154,7 +1192,7 @@ seven_zip_test() {
     # --- 數據抓取 ---
     local mips=$(echo "$output" | grep "^Tot:" | awk '{print $NF}')
     scores+=("$mips")
-      
+
     local usage_val=$(echo "$output" | grep "^Tot:" | awk '{print $(NF-2)}')
     usages+=("$usage_val")
 
@@ -1166,7 +1204,7 @@ seven_zip_test() {
 
     # 3.4 頻率全採樣
     local freq_line_raw=$(echo "$output" | grep "1T CPU Freq (MHz):" | head -n 1 | sed 's/1T CPU Freq (MHz)://g')
-      
+
     for f_val in $freq_line_raw; do
       if [[ "$f_val" =~ ^[0-9]+$ ]]; then
         if [ "$f_val" -lt "$global_freq_min" ]; then global_freq_min=$f_val; fi
@@ -1185,20 +1223,14 @@ seven_zip_test() {
     fi
   done
 
-  # --- 4. 數據統計 ---
-  local sum=0
-  local min=${scores[0]}
-  local max=${scores[0]}
-  for s in "${scores[@]}"; do
-      sum=$(echo "$sum + $s" | bc)
-      if (( s < min )); then min=$s; fi
-      if (( s > max )); then max=$s; fi
-  done
+  # --- 4. 數據統計（原本 scores 與 usages 各跑一次加總迴圈，
+  #          現在都改用同一個 _calc_stats() 函式處理，且完全改用 awk）---
+  local sum avg min max
+  read -r sum avg min max <<< "$(_calc_stats "${scores[@]}")"
+  local jitter
+  jitter=$(awk -v max="$max" -v min="$min" -v avg="$avg" 'BEGIN{printf "%.3f", (max-min)/avg}')
 
-  local avg=$(echo "$sum / $run_count" | bc)
-  local jitter=$(echo "scale=3; ($max - $min) / $avg" | bc | awk '{printf "%.3f", $0}')
-
-  # 4.2 頻率範圍
+  # 4.2 頻率範圍（維持原本用 awk 的寫法，未使用 bc，故不變）
   local final_freq_display="N/A"
   if [ "$global_freq_max" -gt 0 ] && [ "$global_freq_min" -lt 999999 ]; then
       local min_ghz=$(awk -v mhz="$global_freq_min" 'BEGIN {printf "%.2f", mhz/1000}')
@@ -1207,12 +1239,11 @@ seven_zip_test() {
       if [ "$min_ghz" == "$max_ghz" ]; then final_freq_display="${min_ghz} GHz"; fi
   fi
 
-  # 4.3 參考範圍
-  local usage_sum=0
-  for u in "${usages[@]}"; do usage_sum=$(echo "$usage_sum + $u" | bc); done
-  local usage_avg=$(echo "$usage_sum / $run_count" | bc)
-  local ref_low=$(echo "$usage_avg * 35" | bc)
-  local ref_high=$(echo "$usage_avg * 60" | bc)
+  # 4.3 參考範圍（usages 平均值與 ref_low/ref_high 一樣改用 awk，取代 bc）
+  local usage_sum usage_avg
+  read -r usage_sum usage_avg _ _ <<< "$(_calc_stats "${usages[@]}")"
+  local ref_low ref_high
+  read -r ref_low ref_high <<< "$(awk -v avg="$usage_avg" 'BEGIN{printf "%d %d", avg*35, avg*60}')"
 
   local core_count=$(nproc)
 
@@ -1230,9 +1261,11 @@ seven_zip_test() {
   analysis_summary+="- **$t_decomp_score**: ${decomp_str// /, }\n"
   analysis_summary+="$t_ref: ${ref_low} - ${ref_high}\n"
   analysis_summary+="$t_ref_desc"
+  
+  unset _calc_stats
 
   {
-    echo "" 
+    echo ""
     echo "$t_title"
     echo -e "$raw_reports"
     echo ""
@@ -1503,7 +1536,8 @@ speedtest_data() {
   else
     local nearest_dl_speed=$(echo "$nearest_data_line" | cut -d'|' -f1)
     local same_city_dl_speed=$(echo "$same_city_data_line" | cut -d'|' -f1)
-    if (( $(echo "$nearest_dl_speed >= $same_city_dl_speed" | bc -l) )); then
+    # 改用 awk 進行浮點數比較
+    if awk -v a="$nearest_dl_speed" -v b="$same_city_dl_speed" 'BEGIN{exit !(a >= b)}'; then
       local nearest_up_speed=$(echo "$nearest_data_line" | cut -d'|' -f2)
       final_data_pool+=$'\n'; final_data_pool+="$(printf "%.2f|%.2f|%s (本地)\n" "$nearest_dl_speed" "$nearest_up_speed" "$server_city")"
     else
@@ -1511,16 +1545,13 @@ speedtest_data() {
     fi
   fi
 
-
-
-  # 步驟 3: 排序與篩選 (修正重複定義問題)
+  # 步驟 3: 排序與篩選
   local final_data_pool_clean=$(echo "$final_data_pool" | grep -v '^[[:space:]]*$')
   local sorted_data=$(echo "$final_data_pool_clean" | sort -t'|' -k1,1nr)
   local top_10=$(echo "$sorted_data" | head -n 10)
   local bottom_3=$(echo "$sorted_data" | tail -n 3)
 
   # 步驟 4: 產生 Markdown 表格
-  # 根據語言設定表格標題
   case "$lang" in
     cn)
       local t_region="地区"
@@ -1559,6 +1590,7 @@ speedtest_data() {
     done
   }
 }
+
 
 speedtest_global_iperf3() {
   if ! command -v iperf3 >/dev/null 2>&1; then
@@ -1614,14 +1646,21 @@ speedtest_global_iperf3() {
 
   format_speed() {
     local bps=$1
+    # 1. 檢查輸入是否為數字（含小數）或是否為 "null"
     if ! [[ "$bps" =~ ^[0-9]+(\.[0-9]+)?$ ]] || [[ "$bps" == "null" ]]; then
       echo "$t_failed"
-    elif (( $(echo "$bps > 1000000000" | bc -l) )); then
-      printf "%.2f Gbits/s" "$(echo "$bps / 1000000000" | bc -l)"
     else
-      printf "%.2f Mbits/s" "$(echo "$bps / 1000000" | bc -l)"
+      # 2. 使用 awk 處理所有的數值比較與格式化輸出
+      echo "$bps" | awk '{
+        if ($1 > 1000000000) {
+          printf "%.2f Gbits/s", $1 / 1000000000
+        } else {
+          printf "%.2f Mbits/s", $1 / 1000000
+        }
+      }'
     fi
   }
+
 
   for server_info in "${servers[@]}"; do
     local location=$(echo "$server_info" | cut -d';' -f1)
@@ -1986,9 +2025,9 @@ fi
   
 # 初始化
 check_system
-check_app
 create_folder
 # --- Flag 初始化 ---
+do_img=false
 do_hw=false
 do_7zip=false
 do_ip=false
@@ -2087,8 +2126,12 @@ while [[ $# -gt 0 ]]; do
       ;;
   esac
 done
-lang
 if $run_all || $do_hw || $do_ip || $do_nq || $do_nr || $do_stream; then
+  do_img=true
+fi
+check_app
+lang
+if $do_img; then
   case $system in
   1)
     if ! command -v chromium >/dev/null 2>&1; then
