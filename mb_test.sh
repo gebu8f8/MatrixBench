@@ -1,4 +1,7 @@
 #!/bin/bash
+# Copyright (C) 2025 gebu8f
+# SPDX-License-Identifier: AGPL-3.0-or-later
+
 # 檢查是否以root權限運行
 if [ "$(id -u)" -ne 0 ]; then
   echo "此腳本需要 root 權限才能執行（This script requires root privileges to run）" 
@@ -35,7 +38,7 @@ YELLOW='\033[1;33m'  # ⚠️ 警告用黃色
 CYAN="\033[1;36m"    # ℹ️ 一般提示用青色
 RESET='\033[0m'      # 清除顏色
 
-version="v2026.07.07"
+version="v2026.07.15"
 
 handle_error() {
     local exit_code=$?
@@ -308,7 +311,6 @@ ecs_download() {
 }
 
 ecs_simple_static() (
-  local EXECUTABLE_PATH="$TEMP_WORKDIR/goecs"
   local RESULT_DIR="$HOME/result"
   local TEMP_HTML="$TEMP_WORKDIR/temp.html"
   local TEMP_OUTPUT="$TEMP_WORKDIR/temp_output.txt"
@@ -321,44 +323,31 @@ ecs_simple_static() (
       local t_complete="读取系统资讯完成"
       local t_title="系统资讯"
       local lang_param="zh"
-      local title_keyword="系统基础信息"
       ;;
     us)
       local t_reading="Reading system information..."
       local t_complete="System information reading completed"
       local t_title="System Information"
       local lang_param="en"
-      local title_keyword="System-Basic-Information"
       ;;
     *)
       local t_reading="讀取系統資訊..."
       local t_complete="讀取系統資訊完成"
       local t_title="系統資訊"
-      local lang_param="zh"
-      local title_keyword="系统基础信息"
+      local lang_param="en"
       ;;
   esac
 
   echo -e "${CYAN}${t_reading}${RESET}"
   cd "$TEMP_WORKDIR" || exit 1
+  curl https://cdn.spiritlhl.net/https://raw.githubusercontent.com/oneclickvirt/basics/main/basics_install.sh -sSf | bash >/dev/null 2>&1
   
-  script -qfc "$EXECUTABLE_PATH -l $lang_param -menu=false -log=false \
-    -basic=true -cpu=false -memory=false -disk=false \
-    -email=false -nt3=false -security=false \
-    -speed=false -upload=false -ut=false -backtrace=false" \
+  script -qfc "basics -l $lang_param" \
     /dev/null 2>/dev/null | tee "$TEMP_OUTPUT"
 
   echo -e "${GREEN}${t_complete}${RESET}"
 
-  #--- 2. 只保留「系統資訊」區塊 ------------------------------------
-  local extracted_block=$(awk -v kw="$title_keyword" '
-    $0 ~ kw { found = 1 }                # 找到關鍵字行，開始輸出
-    found {
-        print
-        if ($0 ~ /^---/ && $0 !~ kw)     # 碰到下一個分隔線就退出
-            exit
-    }
-  ' "$TEMP_OUTPUT")
+  local extracted_block=$(< "$TEMP_OUTPUT")
   
   aha --title "$t_title" --stylesheet <<< "$extracted_block" > "$TEMP_HTML"
   sed -i '/<\/style>/i \
@@ -1377,7 +1366,7 @@ ip_quality() {
 
   echo -e "${CYAN}$ip_quality_1...${RESET}"
   case $lang in
-  us)
+  us | *)
     ipcecek='-l en'
   esac
   
