@@ -38,7 +38,7 @@ YELLOW='\033[1;33m'  # ⚠️ 警告用黃色
 CYAN="\033[1;36m"    # ℹ️ 一般提示用青色
 RESET='\033[0m'      # 清除顏色
 
-version="v2026.07.15"
+version="v2026.08.11"
 
 handle_error() {
     local exit_code=$?
@@ -1299,7 +1299,7 @@ bgp_tool() {
   esac
 
   # 2. 下載並執行 Go 工具
-  wget -qO "$TOOL_PATH" https://files.gebu8f.page/files/net_tool
+  wget -qO "$TOOL_PATH" https://files.gebu8f.page/net_tool
   chmod +x "$TOOL_PATH"
   
   # 執行工具 (它會輸出 bash 陣列字串 或 exit 2)
@@ -1373,7 +1373,7 @@ ip_quality() {
   bash <(curl -Ls https://IP.Check.Place) $ipcecek -y -p -o $OFFICIAL_ANSI_OUTPUT
   
   sed -i 's/\r//g; /^$/d' "$OFFICIAL_ANSI_OUTPUT"
-  wget -qO $TEMP_WORKDIR/ansi https://files.gebu8f.page/files/ansi
+  wget -qO $TEMP_WORKDIR/ansi https://files.gebu8f.page/ansi
   chmod +x $TEMP_WORKDIR/ansi 
   $TEMP_WORKDIR/ansi -ip $OFFICIAL_ANSI_OUTPUT $TEMP_SVG >/dev/null
   $chromium_comm --headless --no-sandbox --disable-gpu \
@@ -1403,7 +1403,7 @@ net_quality() {
 
   sed -i 's/\r//g; /^$/d' "$OFFICIAL_ANSI_OUTPUT"
   
-  wget -qO $TEMP_WORKDIR/ansi https://files.gebu8f.page/files/ansi
+  wget -qO $TEMP_WORKDIR/ansi https://files.gebu8f.page/ansi
   chmod +x $TEMP_WORKDIR/ansi 
   $TEMP_WORKDIR/ansi -nq $OFFICIAL_ANSI_OUTPUT $TEMP_SVG >/dev/null
   $chromium_comm --headless --no-sandbox --disable-gpu \
@@ -1428,7 +1428,7 @@ net_rounting() {
   
   bash <(curl -Ls https://Net.Check.Place) -R -p -y -o $OFFICIAL_ANSI_OUTPUT
 
-  wget -qO $TEMP_WORKDIR/ansi https://files.gebu8f.page/files/ansi
+  wget -qO $TEMP_WORKDIR/ansi https://files.gebu8f.page/ansi
   chmod +x $TEMP_WORKDIR/ansi 
   $TEMP_WORKDIR/ansi -nr $OFFICIAL_ANSI_OUTPUT $TEMP_SVG >/dev/null
   $chromium_comm --headless --no-sandbox --disable-gpu \
@@ -1841,21 +1841,18 @@ aria2_test(){
       local t_prompt="加码测试：这是一个 aria2c 下载 Ubuntu 大档案五次，每次休息三十秒的网络稳定性测试。五次消耗流量大约是29GB。为了避免耗尽您的流量还有被服务商停驶您的伺服器，是否继续？(Y/n) [预设是：N] "
       local t_cancelled="测试已取消。"
       local t_start="网络稳定性加码测试开始，这将需要几分钟时间..."
-      local t_title="## 网络稳定性测试"
       local t_complete="网络稳定性测试完成"
       ;;
     us)
       local t_prompt="Bonus test: This is an aria2c download test of Ubuntu large files five times, with a 30-second break between each download for network stability testing. Five downloads consume approximately 29GB of traffic. To avoid exhausting your traffic and having your server suspended by the service provider, do you want to continue? (Y/n) [Default: N] "
       local t_cancelled="Test cancelled."
       local t_start="Network stability bonus test started, this will take a few minutes..."
-      local t_title="## Network Stability Test"
       local t_complete="Network stability test completed"
       ;;
     *)
       local t_prompt="加碼測試：這是一個 aria2c 下載 Ubuntu 大檔案五次，每次休息三十秒的網路穩定性測試。五次消耗流量大約是29GB。為了避免耗盡您的流量還有被服務商停駛您的伺服器，是否繼續？(Y/n) [預設是：N] "
       local t_cancelled="測試已取消。"
       local t_start="網路穩定性加碼測試開始，這將需要幾分鐘時間..."
-      local t_title="## 網路穩定性測試"
       local t_complete="網路穩定性測試完成"
       ;;
   esac
@@ -1872,8 +1869,6 @@ aria2_test(){
   echo "$t_start"
 
   # 在報告檔案中先寫入標題和一個換行
-  echo -e "$t_title\n" >> "$report_file"
-
   # 執行遠端腳本，並將其標準輸出通過 tee 分流
   case $lang in
   us)
@@ -1884,8 +1879,8 @@ aria2_test(){
     ;;
   esac
   
-  bash <(curl -Ls https://gitlab.com/gebu8f/sh/-/raw/main/testing_server/final_judgement.sh) $final_lang_param | \
-  tee >(sed -n '/^------------------------------------------------------------------$/,$p' > "$report_file")
+  bash <(curl -Ls https://gitlab.com/gebu8f/sh/-/raw/main/testing_server/final_judgement.sh) $final_lang_param
+  \cp "/tmp/network_stability_report.md" "$report_file"
 
   echo ""
   echo "$t_complete"
